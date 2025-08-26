@@ -375,7 +375,7 @@ impl ErrorContext {
 impl From<Box<turbomcp_core::Error>> for ServerError {
     fn from(core_error: Box<turbomcp_core::Error>) -> Self {
         use turbomcp_core::ErrorKind;
-        
+
         match core_error.kind {
             ErrorKind::Handler => Self::Handler {
                 message: core_error.message,
@@ -397,7 +397,10 @@ impl From<Box<turbomcp_core::Error>> for ServerError {
                 context: None,
             },
             ErrorKind::Timeout => Self::Timeout {
-                operation: core_error.context.operation.unwrap_or_else(|| "unknown".to_string()),
+                operation: core_error
+                    .context
+                    .operation
+                    .unwrap_or_else(|| "unknown".to_string()),
                 timeout_ms: 30000, // Default timeout
             },
             ErrorKind::RateLimited => Self::RateLimit {
@@ -408,16 +411,26 @@ impl From<Box<turbomcp_core::Error>> for ServerError {
                 message: core_error.message,
                 key: None,
             },
-            ErrorKind::Transport => Self::Internal(format!("Transport error: {}", core_error.message)),
-            ErrorKind::Serialization => Self::Internal(format!("Serialization error: {}", core_error.message)),
-            ErrorKind::Protocol => Self::Internal(format!("Protocol error: {}", core_error.message)),
+            ErrorKind::Transport => {
+                Self::Internal(format!("Transport error: {}", core_error.message))
+            }
+            ErrorKind::Serialization => {
+                Self::Internal(format!("Serialization error: {}", core_error.message))
+            }
+            ErrorKind::Protocol => {
+                Self::Internal(format!("Protocol error: {}", core_error.message))
+            }
             ErrorKind::Unavailable => Self::ResourceExhausted {
                 resource: "service".to_string(),
                 current: None,
                 max: None,
             },
-            ErrorKind::ExternalService => Self::Internal(format!("External service error: {}", core_error.message)),
-            ErrorKind::Cancelled => Self::Internal(format!("Operation cancelled: {}", core_error.message)),
+            ErrorKind::ExternalService => {
+                Self::Internal(format!("External service error: {}", core_error.message))
+            }
+            ErrorKind::Cancelled => {
+                Self::Internal(format!("Operation cancelled: {}", core_error.message))
+            }
             ErrorKind::Internal => Self::Internal(core_error.message),
         }
     }

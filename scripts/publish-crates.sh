@@ -2,13 +2,26 @@
 
 # TurboMCP Manual Publishing Script
 # Quick script to publish all crates in the correct order
+#
+# Environment variables:
+#   DELAY_BETWEEN_PUBLISHES - Delay between publishes (default: 60 seconds)
+#   VERIFICATION_RETRIES - Number of verification attempts (default: 3)
+#
+# Usage:
+#   ./scripts/publish-crates.sh
+#   DELAY_BETWEEN_PUBLISHES=120 ./scripts/publish-crates.sh  # 2 minute delays
 
 set -euo pipefail
+
+# Configuration
+DELAY_BETWEEN_PUBLISHES=${DELAY_BETWEEN_PUBLISHES:-60}  # 60 seconds between publishes
+VERIFICATION_RETRIES=${VERIFICATION_RETRIES:-3}  # Number of verification attempts
 
 # Colors
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
+RED='\033[0;31m'
 NC='\033[0m'
 
 # Crate publish order (dependencies first)
@@ -25,6 +38,10 @@ CRATES=(
 
 echo -e "${BLUE}🚀 Publishing TurboMCP Crates${NC}"
 echo "=============================="
+echo ""
+echo "Configuration:"
+echo "  Delay between publishes: ${DELAY_BETWEEN_PUBLISHES}s" 
+echo "  Verification retries: ${VERIFICATION_RETRIES}"
 echo ""
 
 # Check if we're logged in by testing credentials file
@@ -51,17 +68,37 @@ for i in "${!CRATES[@]}"; do
     echo ""
     echo -e "${BLUE}Publishing $((i+1))/${#CRATES[@]}: $crate${NC}"
     
+    # Publish with extended delay handling
     if cargo publish --manifest-path "crates/$crate/Cargo.toml"; then
         echo -e "${GREEN}✅ $crate published successfully${NC}"
+        
+        # Verify publication by checking crates.io (with retries)
+        echo "Verifying publication on crates.io..."
+        for attempt in $(seq 1 $VERIFICATION_RETRIES); do
+            if cargo search --limit 1 "$crate" | grep -q "$crate"; then
+                echo -e "${GREEN}✅ $crate verified on crates.io${NC}"
+                break
+            else
+                if [ $attempt -lt $VERIFICATION_RETRIES ]; then
+                    echo "Verification attempt $attempt failed, retrying in 10s..."
+                    sleep 10
+                else
+                    echo -e "${YELLOW}⚠️  $crate published but verification failed (this is usually fine)${NC}"
+                fi
+            fi
+        done
     else
         echo -e "${RED}❌ Failed to publish $crate${NC}"
+        echo "This could be due to network issues, rate limiting, or dependency problems."
+        echo "You may want to try again with a longer delay: DELAY_BETWEEN_PUBLISHES=120 $0"
         exit 1
     fi
     
     # Wait between publishes (except for the last one)
     if [ $i -lt $((${#CRATES[@]} - 1)) ]; then
-        echo "Waiting 30 seconds for crates.io to process..."
-        sleep 30
+        echo "Waiting $DELAY_BETWEEN_PUBLISHES seconds for crates.io to process and avoid timeout..."
+        echo "(This prevents rate limiting and dependency resolution issues)"
+        sleep $DELAY_BETWEEN_PUBLISHES
     fi
 done
 

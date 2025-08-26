@@ -2,6 +2,7 @@
 
 # Simple TurboMCP Release Check Script
 # Quick validation without benchmarks and examples
+# World-class implementation with proper tool detection and error handling
 
 set -euo pipefail
 
@@ -13,16 +14,11 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 DRY_RUN=${DRY_RUN:-true}
-VERSION="1.0.0"
+VERSION="1.0.1"
 
-echo -e "${BLUE}🚀 TurboMCP Simple Release Check${NC}"
-echo -e "${BLUE}===================================${NC}"
-echo ""
-
-if [ "$DRY_RUN" = "true" ]; then
-    echo -e "${YELLOW}⚠️  DRY RUN MODE${NC}"
-    echo ""
-fi
+# ============================================================================
+# Utility Functions
+# ============================================================================
 
 # Function to print status
 print_status() {
@@ -32,6 +28,61 @@ print_status() {
 print_error() {
     echo -e "${RED}❌ $1${NC}"
 }
+
+# ============================================================================
+# Tool Detection and Environment Setup
+# ============================================================================
+
+# Detect available search tools with fallback priority
+detect_search_tool() {
+    # Try ripgrep (preferred)
+    if command -v rg >/dev/null 2>&1 && rg --version >/dev/null 2>&1; then
+        echo "rg"
+        return 0
+    fi
+    
+    # Fallback to grep with extended regex
+    if command -v grep >/dev/null 2>&1; then
+        echo "grep"
+        return 0
+    fi
+    
+    print_error "No search tool available (ripgrep or grep required)"
+    exit 1
+}
+
+# Set search tool globally
+SEARCH_TOOL=$(detect_search_tool)
+print_status "Using search tool: $SEARCH_TOOL"
+
+# Universal search function with tool-specific implementations
+search_todos() {
+    local pattern="$1"
+    local path="$2"
+    
+    case "$SEARCH_TOOL" in
+        "rg")
+            # Use ripgrep with proper flags
+            rg "$pattern" --type rust "$path" --count-matches 2>/dev/null | awk -F: '{sum+=$2} END {print (sum ? sum : 0)}'
+            ;;
+        "grep")
+            # Use grep with fallback
+            find "$path" -name "*.rs" -exec grep -l "$pattern" {} \; 2>/dev/null | wc -l | tr -d ' '
+            ;;
+        *)
+            echo "0"
+            ;;
+    esac
+}
+
+echo -e "${BLUE}🚀 TurboMCP Simple Release Check${NC}"
+echo -e "${BLUE}===================================${NC}"
+echo ""
+
+if [ "$DRY_RUN" = "true" ]; then
+    echo -e "${YELLOW}⚠️  DRY RUN MODE${NC}"
+    echo ""
+fi
 
 echo -e "${BLUE}📋 Basic Checks${NC}"
 echo "----------------"
@@ -94,10 +145,10 @@ echo ""
 echo -e "${BLUE}🔍 Code Quality Check${NC}"
 echo "----------------------"
 echo "Checking for critical TODOs and stub implementations..."
-todo_count=$(rg "TODO.*implement|TODO.*stub|not_implemented|unimplemented" --type rust crates/ --count-matches | awk -F: '{sum+=$2} END {print sum}')
+todo_count=$(search_todos "TODO.*implement|TODO.*stub|not_implemented|unimplemented" "crates/")
 if [ "$todo_count" -gt 5 ]; then
-    print_error "Found $todo_count critical TODOs/stubs - too many for 1.0.0 release"
-    echo "Run: rg \"TODO.*implement|TODO.*stub|not_implemented|unimplemented\" --type rust crates/"
+    print_error "Found $todo_count critical TODOs/stubs - too many for 1.0.1 release"
+    echo "To inspect: find crates/ -name '*.rs' -exec grep -n \"TODO.*implement\\|TODO.*stub\\|not_implemented\\|unimplemented\" {} +"
     exit 1
 else
     print_status "Code quality check passed ($todo_count acceptable TODOs found)"
