@@ -27,12 +27,12 @@ NC='\033[0m'
 # Crate publish order (dependencies first)
 CRATES=(
     "turbomcp-core"
-    "turbomcp-macros"
     "turbomcp-protocol"
-    "turbomcp-transport"
-    "turbomcp-cli"
-    "turbomcp-client"
+    "turbomcp-transport" 
+    "turbomcp-macros"
     "turbomcp-server"
+    "turbomcp-client"
+    "turbomcp-cli"
     "turbomcp"
 )
 

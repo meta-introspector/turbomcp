@@ -19,12 +19,12 @@ VERSION="1.0.1"
 # Crate publish order (dependencies first)
 CRATES=(
     "turbomcp-core"
-    "turbomcp-macros"
     "turbomcp-protocol"
-    "turbomcp-transport"
-    "turbomcp-cli"
-    "turbomcp-client"
+    "turbomcp-transport" 
+    "turbomcp-macros"
     "turbomcp-server"
+    "turbomcp-client"
+    "turbomcp-cli"
     "turbomcp"
 )
 

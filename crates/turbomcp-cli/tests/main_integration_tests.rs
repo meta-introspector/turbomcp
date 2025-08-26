@@ -77,7 +77,7 @@ fn test_cli_parsing_tools_list() {
     match cli.command {
         Commands::ToolsList(conn) => {
             assert_eq!(conn.url, "http://test.com");
-            assert!(matches!(conn.transport, TransportKind::Http));
+            assert!(matches!(conn.transport, Some(TransportKind::Http)));
         }
         _ => panic!("Expected ToolsList command"),
     }
@@ -92,6 +92,7 @@ fn test_cli_parsing_tools_call() {
         "http",
         "--url",
         "http://test.com",
+        "--name",
         "test_tool",
         "--arguments",
         r#"{"key": "value"}"#,
@@ -108,7 +109,7 @@ fn test_cli_parsing_tools_call() {
             assert_eq!(conn.url, "http://test.com");
             assert_eq!(name, "test_tool");
             assert_eq!(arguments, r#"{"key": "value"}"#);
-            assert!(matches!(conn.transport, TransportKind::Http));
+            assert!(matches!(conn.transport, Some(TransportKind::Http)));
         }
         _ => panic!("Expected ToolsCall command"),
     }
@@ -129,9 +130,9 @@ fn test_cli_parsing_schema_export() {
     let cli = Cli::try_parse_from(args).unwrap();
 
     match cli.command {
-        Commands::SchemaExport(conn) => {
+        Commands::SchemaExport { conn, .. } => {
             assert_eq!(conn.url, "ws://test.com");
-            assert!(matches!(conn.transport, TransportKind::Ws));
+            assert!(matches!(conn.transport, Some(TransportKind::Ws)));
             assert!(conn.json);
         }
         _ => panic!("Expected SchemaExport command"),
@@ -167,7 +168,7 @@ fn test_cli_parsing_defaults() {
 
     match cli.command {
         Commands::ToolsList(conn) => {
-            assert!(matches!(conn.transport, TransportKind::Stdio));
+            assert!(matches!(conn.transport, None)); // None for auto-detection
             assert_eq!(conn.url, "http://localhost:8080/mcp");
             assert_eq!(conn.auth, None);
             assert!(!conn.json);
@@ -193,7 +194,8 @@ fn test_cli_parsing_invalid_transport() {
 #[test]
 fn test_output_json_format() {
     let conn = Connection {
-        transport: TransportKind::Http,
+        transport: Some(TransportKind::Http),
+        command: None,
         url: "http://test.com".to_string(),
         auth: None,
         json: true,
@@ -208,7 +210,8 @@ fn test_output_json_format() {
 #[test]
 fn test_output_non_json_format() {
     let conn = Connection {
-        transport: TransportKind::Http,
+        transport: Some(TransportKind::Http),
+        command: None,
         url: "http://test.com".to_string(),
         auth: None,
         json: false,
@@ -224,7 +227,8 @@ fn test_output_non_json_format() {
 #[tokio::test]
 async fn test_cmd_tools_list_stdio_error() {
     let conn = Connection {
-        transport: TransportKind::Stdio,
+        transport: Some(TransportKind::Stdio),
+        command: None,
         url: "unused".to_string(),
         auth: None,
         json: false,
@@ -241,7 +245,8 @@ async fn test_cmd_tools_list_stdio_error() {
 #[tokio::test]
 async fn test_cmd_tools_call_stdio_error() {
     let conn = Connection {
-        transport: TransportKind::Stdio,
+        transport: Some(TransportKind::Stdio),
+        command: None,
         url: "unused".to_string(),
         auth: None,
         json: false,
@@ -258,13 +263,14 @@ async fn test_cmd_tools_call_stdio_error() {
 #[tokio::test]
 async fn test_cmd_schema_export_stdio_error() {
     let conn = Connection {
-        transport: TransportKind::Stdio,
+        transport: Some(TransportKind::Stdio),
+        command: None,
         url: "unused".to_string(),
         auth: None,
         json: false,
     };
 
-    let result = cmd_schema_export(conn).await;
+    let result = cmd_schema_export(conn, None).await;
     assert!(result.is_err());
 
     if let Err(e) = result {
@@ -275,7 +281,8 @@ async fn test_cmd_schema_export_stdio_error() {
 #[tokio::test]
 async fn test_cmd_tools_call_invalid_arguments() {
     let conn = Connection {
-        transport: TransportKind::Http,
+        transport: Some(TransportKind::Http),
+        command: None,
         url: "http://nonexistent.com".to_string(),
         auth: None,
         json: false,
@@ -294,7 +301,8 @@ async fn test_cmd_tools_call_invalid_arguments() {
 #[test]
 fn test_connection_debug_format() {
     let conn = Connection {
-        transport: TransportKind::Http,
+        transport: Some(TransportKind::Http),
+        command: None,
         url: "http://test.com".to_string(),
         auth: Some("token".to_string()),
         json: true,
@@ -309,8 +317,9 @@ fn test_connection_debug_format() {
 #[test]
 fn test_connection_clone() {
     let original = Connection {
-        transport: TransportKind::Ws,
+        transport: Some(TransportKind::Ws),
         url: "ws://test.com".to_string(),
+        command: None,
         auth: None,
         json: false,
     };
@@ -353,7 +362,8 @@ fn test_cli_debug_format() {
 fn test_commands_enum_variants() {
     // Test that all command variants can be created and debugged
     let conn = Connection {
-        transport: TransportKind::Http,
+        transport: Some(TransportKind::Http),
+        command: None,
         url: "http://test.com".to_string(),
         auth: None,
         json: false,
@@ -365,7 +375,7 @@ fn test_commands_enum_variants() {
         name: "test".to_string(),
         arguments: "{}".to_string(),
     };
-    let schema_export = Commands::SchemaExport(conn);
+    let schema_export = Commands::SchemaExport { conn, output: None };
 
     // All should be debuggable
     let debug1 = format!("{tools_list:?}");

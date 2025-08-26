@@ -79,7 +79,12 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
 ```bash
 # Test with CLI tool
 cargo install turbomcp-cli
-turbomcp-cli tools-list --transport stdio --command "./your-server"
+
+# For HTTP/WebSocket servers
+turbomcp-cli tools-list --url http://localhost:8080/mcp
+
+# For STDIO servers (like Claude Desktop)
+turbomcp-cli tools-list --command "./your-server"
 
 # Test directly
 echo '{"jsonrpc": "2.0", "id": 1, "method": "tools/list"}' | ./your-server
@@ -298,17 +303,17 @@ cargo install turbomcp-cli
 
 **Usage:**
 ```bash
-# List available tools
-turbomcp-cli tools-list --transport http --url http://localhost:8080/mcp
+# List available tools (HTTP)
+turbomcp-cli tools-list --url http://localhost:8080/mcp
+
+# List available tools (STDIO)
+turbomcp-cli tools-list --command "./my-server"
 
 # Call a tool with arguments
-turbomcp-cli tools-call --name "add" --arguments '{"a": 5, "b": 3}'
+turbomcp-cli tools-call --url http://localhost:8080/mcp --name add --arguments '{"a": 5, "b": 3}'
 
-# Export JSON schemas
-turbomcp-cli schema-export --json
-
-# Test with STDIO transport
-turbomcp-cli tools-list --transport stdio --command "./your-server"
+# Export JSON schemas to file
+turbomcp-cli schema-export --url http://localhost:8080/mcp --output schemas.json
 ```
 
 ## Performance

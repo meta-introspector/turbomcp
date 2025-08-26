@@ -7,7 +7,8 @@ use turbomcp_cli::{Connection, TransportKind};
 #[tokio::test]
 async fn test_cmd_tools_list_stdio_error() {
     let conn = Connection {
-        transport: TransportKind::Stdio,
+        transport: Some(TransportKind::Stdio),
+        command: None,
         url: "nonexistent_command".to_string(),
         auth: None,
         json: false,
@@ -23,7 +24,8 @@ async fn test_cmd_tools_list_stdio_error() {
 #[tokio::test]
 async fn test_cmd_tools_call_stdio_error() {
     let conn = Connection {
-        transport: TransportKind::Stdio,
+        transport: Some(TransportKind::Stdio),
+        command: None,
         url: "nonexistent_command".to_string(),
         auth: None,
         json: false,
@@ -40,14 +42,15 @@ async fn test_cmd_tools_call_stdio_error() {
 #[tokio::test]
 async fn test_cmd_schema_export_stdio_error() {
     let conn = Connection {
-        transport: TransportKind::Stdio,
+        transport: Some(TransportKind::Stdio),
+        command: None,
         url: "nonexistent_command".to_string(),
         auth: None,
         json: false,
     };
 
     // This should return an error since command execution will fail
-    let result = turbomcp_cli::cmd_schema_export(conn).await;
+    let result = turbomcp_cli::cmd_schema_export(conn, None).await;
     assert!(result.is_err());
     let error = result.unwrap_err();
     assert!(error.contains("Failed to spawn command"));
@@ -56,7 +59,8 @@ async fn test_cmd_schema_export_stdio_error() {
 #[tokio::test]
 async fn test_http_call_tool_invalid_json() {
     let conn = Connection {
-        transport: TransportKind::Http,
+        transport: Some(TransportKind::Http),
+        command: None,
         url: "http://localhost:8080/test".to_string(),
         auth: None,
         json: false,
@@ -73,7 +77,8 @@ async fn test_http_call_tool_invalid_json() {
 #[tokio::test]
 async fn test_connection_debug_format() {
     let conn = Connection {
-        transport: TransportKind::Http,
+        transport: Some(TransportKind::Http),
+        command: None,
         url: "http://localhost:8080/test".to_string(),
         auth: Some("test_token".to_string()),
         json: true,
@@ -105,7 +110,8 @@ async fn test_transport_kind_debug_format() {
 #[tokio::test]
 async fn test_connection_clone() {
     let conn = Connection {
-        transport: TransportKind::Ws,
+        transport: Some(TransportKind::Ws),
+        command: None,
         url: "ws://localhost:8080/test".to_string(),
         auth: Some("token".to_string()),
         json: false,
@@ -134,7 +140,8 @@ async fn test_transport_kind_clone() {
 #[test]
 fn test_output_json_format() {
     let conn = Connection {
-        transport: TransportKind::Http,
+        transport: Some(TransportKind::Http),
+        command: None,
         url: "test".to_string(),
         auth: None,
         json: true,
@@ -150,7 +157,8 @@ fn test_output_json_format() {
 #[test]
 fn test_output_non_json_format() {
     let conn = Connection {
-        transport: TransportKind::Http,
+        transport: Some(TransportKind::Http),
+        command: None,
         url: "test".to_string(),
         auth: None,
         json: false,
@@ -167,7 +175,8 @@ fn test_output_non_json_format() {
 #[tokio::test]
 async fn test_connection_with_auth() {
     let conn = Connection {
-        transport: TransportKind::Http,
+        transport: Some(TransportKind::Http),
+        command: None,
         url: "http://localhost:8080/test".to_string(),
         auth: Some("Bearer test_token_123".to_string()),
         json: true,
@@ -181,7 +190,8 @@ async fn test_connection_with_auth() {
 #[tokio::test]
 async fn test_connection_without_auth() {
     let conn = Connection {
-        transport: TransportKind::Http,
+        transport: Some(TransportKind::Http),
+        command: None,
         url: "http://localhost:8080/test".to_string(),
         auth: None,
         json: false,
@@ -195,14 +205,16 @@ async fn test_connection_without_auth() {
 #[tokio::test]
 async fn test_different_url_formats() {
     let http_conn = Connection {
-        transport: TransportKind::Http,
+        transport: Some(TransportKind::Http),
+        command: None,
         url: "https://api.example.com/mcp".to_string(),
         auth: None,
         json: false,
     };
 
     let ws_conn = Connection {
-        transport: TransportKind::Ws,
+        transport: Some(TransportKind::Ws),
+        command: None,
         url: "wss://api.example.com/mcp".to_string(),
         auth: None,
         json: false,
@@ -217,7 +229,8 @@ async fn test_different_url_formats() {
 #[tokio::test]
 async fn test_websocket_transport_mapping() {
     let conn = Connection {
-        transport: TransportKind::Ws,
+        transport: Some(TransportKind::Ws),
+        command: None,
         url: "ws://localhost:8080/test".to_string(),
         auth: None,
         json: false,
@@ -234,7 +247,7 @@ async fn test_websocket_transport_mapping() {
         turbomcp_cli::cmd_tools_call(conn.clone(), "test".to_string(), "{}".to_string()).await;
     assert!(result.is_err());
 
-    let result = turbomcp_cli::cmd_schema_export(conn).await;
+    let result = turbomcp_cli::cmd_schema_export(conn, None).await;
     assert!(result.is_err());
 }
 
@@ -242,7 +255,8 @@ async fn test_websocket_transport_mapping() {
 #[tokio::test]
 async fn test_malformed_json_arguments() {
     let conn = Connection {
-        transport: TransportKind::Http,
+        transport: Some(TransportKind::Http),
+        command: None,
         url: "http://localhost:8080/test".to_string(),
         auth: None,
         json: false,
@@ -274,7 +288,8 @@ async fn test_malformed_json_arguments() {
 #[tokio::test]
 async fn test_valid_json_arguments() {
     let conn = Connection {
-        transport: TransportKind::Http,
+        transport: Some(TransportKind::Http),
+        command: None,
         url: "http://localhost:8080/test".to_string(),
         auth: None,
         json: false,

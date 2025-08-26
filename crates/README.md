@@ -201,8 +201,11 @@ turbomcp-core = "1.0"
 # Install CLI tools
 cargo install --path turbomcp-cli
 
-# Use for testing servers
-turbomcp-cli tools-list --transport stdio --command "path/to/server"
+# Use for testing HTTP servers
+turbomcp-cli tools-list --url http://localhost:8080/mcp
+
+# Use for testing STDIO servers
+turbomcp-cli tools-list --command "./my-server"
 ```
 
 ## Documentation

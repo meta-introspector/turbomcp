@@ -22,7 +22,7 @@ fn test_cli_parsing_tools_list() {
 
     match cli.command {
         Commands::ToolsList(conn) => {
-            assert!(matches!(conn.transport, TransportKind::Http));
+            assert!(matches!(conn.transport, Some(TransportKind::Http)));
             assert_eq!(conn.url, "http://localhost:8080/mcp");
             assert_eq!(conn.auth.as_ref().unwrap(), "bearer_token_123");
             assert!(conn.json);
@@ -40,6 +40,7 @@ fn test_cli_parsing_tools_call() {
         "ws",
         "--url",
         "ws://localhost:8080/mcp",
+        "--name",
         "add_numbers",
         "--arguments",
         r#"{"a": 5, "b": 3}"#,
@@ -53,7 +54,7 @@ fn test_cli_parsing_tools_call() {
             name,
             arguments,
         } => {
-            assert!(matches!(conn.transport, TransportKind::Ws));
+            assert!(matches!(conn.transport, Some(TransportKind::Ws)));
             assert_eq!(conn.url, "ws://localhost:8080/mcp");
             assert!(conn.auth.is_none());
             assert!(!conn.json);
@@ -77,8 +78,8 @@ fn test_cli_parsing_schema_export() {
     let cli = Cli::try_parse_from(args).expect("Failed to parse CLI args");
 
     match cli.command {
-        Commands::SchemaExport(conn) => {
-            assert!(matches!(conn.transport, TransportKind::Stdio));
+        Commands::SchemaExport { conn, .. } => {
+            assert!(matches!(conn.transport, Some(TransportKind::Stdio)));
             assert_eq!(conn.url, "http://localhost:8080/mcp"); // default
             assert!(conn.auth.is_none());
             assert!(conn.json);
@@ -95,7 +96,7 @@ fn test_cli_parsing_with_defaults() {
 
     match cli.command {
         Commands::ToolsList(conn) => {
-            assert!(matches!(conn.transport, TransportKind::Stdio)); // default
+            assert!(matches!(conn.transport, None)); // None means auto-detection
             assert_eq!(conn.url, "http://localhost:8080/mcp"); // default
             assert!(conn.auth.is_none());
             assert!(!conn.json);
@@ -109,6 +110,7 @@ fn test_cli_parsing_tools_call_with_defaults() {
     let args = vec![
         "turbomcp-cli",
         "tools-call",
+        "--name",
         "test_tool", // arguments will use default "{}"
     ];
 
@@ -120,7 +122,7 @@ fn test_cli_parsing_tools_call_with_defaults() {
             name,
             arguments,
         } => {
-            assert!(matches!(conn.transport, TransportKind::Stdio)); // default
+            assert!(matches!(conn.transport, None)); // None means auto-detection
             assert_eq!(conn.url, "http://localhost:8080/mcp"); // default
             assert!(conn.auth.is_none());
             assert!(!conn.json);
@@ -157,7 +159,8 @@ fn test_transport_kind_variants() {
 #[test]
 fn test_connection_comprehensive() {
     let conn = Connection {
-        transport: TransportKind::Http,
+        transport: Some(TransportKind::Http),
+        command: None,
         url: "https://api.example.com/mcp".to_string(),
         auth: Some("api_key_12345".to_string()),
         json: true,
@@ -206,7 +209,7 @@ fn test_connection_args_parsing() {
 
     let parsed = TestArgs::try_parse_from(args).expect("Failed to parse args");
 
-    assert!(matches!(parsed.connection.transport, TransportKind::Http));
+    assert!(matches!(parsed.connection.transport, Some(TransportKind::Http)));
     assert_eq!(parsed.connection.url, "http://test.com");
     assert_eq!(parsed.connection.auth.as_ref().unwrap(), "token123");
     assert!(parsed.connection.json);
@@ -258,7 +261,8 @@ fn test_cli_parsing_tools_call_missing_name() {
 #[tokio::test]
 async fn test_output_function_edge_cases() {
     let conn = Connection {
-        transport: TransportKind::Http,
+        transport: Some(TransportKind::Http),
+        command: None,
         url: "test".to_string(),
         auth: None,
         json: true,
@@ -309,7 +313,8 @@ async fn test_output_function_edge_cases() {
 #[tokio::test]
 async fn test_output_non_json_mode() {
     let conn = Connection {
-        transport: TransportKind::Http,
+        transport: Some(TransportKind::Http),
+        command: None,
         url: "test".to_string(),
         auth: None,
         json: false, // non-JSON mode
@@ -338,7 +343,8 @@ fn test_url_formats() {
 
     for url in urls {
         let conn = Connection {
-            transport: TransportKind::Http,
+            transport: Some(TransportKind::Http),
+        command: None,
             url: url.to_string(),
             auth: None,
             json: false,
@@ -363,7 +369,8 @@ fn test_auth_token_formats() {
 
     for token in tokens {
         let conn = Connection {
-            transport: TransportKind::Http,
+            transport: Some(TransportKind::Http),
+        command: None,
             url: "http://localhost:8080/test".to_string(),
             auth: if token.is_empty() {
                 None

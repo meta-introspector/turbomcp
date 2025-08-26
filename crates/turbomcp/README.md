@@ -122,7 +122,12 @@ cargo run
 
 # Test with TurboMCP CLI
 cargo install turbomcp-cli
-turbomcp-cli tools-list --transport stdio --command "./target/debug/my-server"
+
+# For HTTP server
+turbomcp-cli tools-list --url http://localhost:8080/mcp
+
+# For STDIO server  
+turbomcp-cli tools-list --command "./target/debug/my-server"
 ```
 
 ## Core Concepts
@@ -526,10 +531,9 @@ Use the TurboMCP CLI for integration testing:
 cargo install turbomcp-cli
 
 # Test server functionality
-turbomcp-cli server-test --transport stdio --command "./target/debug/my-server"
-
-# Benchmark performance
-turbomcp-cli benchmark --transport stdio --command "./target/debug/my-server" --duration 60s
+turbomcp-cli tools-list --url http://localhost:8080/mcp
+turbomcp-cli tools-call --url http://localhost:8080/mcp --name add --arguments '{"a": 5, "b": 3}'
+turbomcp-cli schema-export --url http://localhost:8080/mcp --output schemas.json
 ```
 
 ## Client Setup

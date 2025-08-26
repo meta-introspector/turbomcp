@@ -4,38 +4,18 @@
 [![Documentation](https://docs.rs/turbomcp-cli/badge.svg)](https://docs.rs/turbomcp-cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**Comprehensive command-line tools for developing, testing, debugging, and deploying MCP servers with world-class developer experience.**
+**Command-line interface for interacting with MCP servers - list tools, call tools, and export schemas.**
 
 ## Overview
 
-`turbomcp-cli` provides a complete toolkit for MCP server development. From initial scaffolding to production deployment, the CLI handles server testing, protocol debugging, performance benchmarking, schema validation, and configuration management.
+`turbomcp-cli` provides essential tools for working with MCP (Model Context Protocol) servers. Connect to any MCP server via HTTP or WebSocket to explore available tools, execute them, and export their schemas.
 
-## Key Features
+## Features
 
-### 🧪 **Server Testing & Validation**
-- **Comprehensive testing** - Full MCP protocol compliance validation
-- **Tool validation** - Automated testing of tool functionality and schemas
-- **Resource testing** - URI template validation and resource access testing  
-- **Integration testing** - End-to-end workflow validation
-- **Performance testing** - Load testing and benchmarking capabilities
-
-### 🔧 **Protocol Debugging**
-- **Message inspection** - Real-time JSON-RPC message logging and analysis
-- **Protocol validation** - MCP specification compliance checking
-- **Schema debugging** - JSON schema validation and error reporting
-- **Transport debugging** - Connection and transport-layer troubleshooting
-
-### 📊 **Performance & Benchmarking**
-- **Load testing** - Configurable concurrent request testing
-- **Latency analysis** - Request/response timing analysis
-- **Throughput measurement** - Messages per second benchmarking
-- **Memory profiling** - Resource usage analysis and optimization
-
-### 📋 **Schema Management**
-- **Schema export** - Extract JSON schemas from MCP servers
-- **Schema validation** - Validate schemas against MCP specification
-- **Documentation generation** - Automatic API documentation from schemas
-- **Schema comparison** - Diff and compatibility checking between versions
+- **🔧 Tool Management** - List and call tools on running MCP servers
+- **📋 Schema Export** - Export tool schemas for documentation and validation  
+- **🌐 Multi-Transport** - Support for HTTP and WebSocket connections
+- **📊 JSON Output** - Machine-readable output for automation
 
 ## Installation
 
@@ -46,10 +26,7 @@
 cargo install turbomcp-cli
 
 # Install specific version
-cargo install turbomcp-cli --version 1.0.0
-
-# Install with all features
-cargo install turbomcp-cli --all-features
+cargo install turbomcp-cli --version 1.0.1
 ```
 
 ### From Source
@@ -60,707 +37,182 @@ cd turbomcp
 cargo install --path crates/turbomcp-cli
 ```
 
-### Binary Releases
+## Usage
 
-Download pre-built binaries from [GitHub Releases](https://github.com/Epistates/turbomcp/releases).
+```bash
+turbomcp-cli <COMMAND>
+
+Commands:
+  tools-list     List tools from a running server
+  tools-call     Call a tool on a running server  
+  schema-export  Export tool schemas from a running server
+  help           Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+```
+
+### Connection Options
+
+All commands support these connection options:
+
+- `--url <URL>` - Server URL for HTTP/WebSocket or command path for STDIO (default: `http://localhost:8080/mcp`)
+- `--command <COMMAND>` - Command to execute for STDIO transport (overrides `--url`)
+- `--auth <AUTH>` - Bearer token or API key for authentication
+- `--json` - Output results in JSON format
 
 ## Commands
 
-### Server Testing
+### `tools-list` - List Available Tools
 
-#### `tools-list` - List Available Tools
+List all tools available from an MCP server.
 
 ```bash
-# List tools via STDIO transport
-turbomcp-cli tools-list --transport stdio --command "./my-server"
+# List tools from HTTP server
+turbomcp-cli tools-list --url http://localhost:8080/mcp
 
-# List tools via HTTP transport
-turbomcp-cli tools-list --transport http --url http://localhost:8080/mcp
+# List tools from WebSocket server  
+turbomcp-cli tools-list --url ws://localhost:8080/mcp
 
-# List tools with detailed schemas
-turbomcp-cli tools-list --transport stdio --command "./my-server" --detailed
-
-# Output as JSON
-turbomcp-cli tools-list --transport stdio --command "./my-server" --output json
+# List tools from STDIO server
+turbomcp-cli tools-list --command "./target/debug/my-server"
 ```
 
 **Example Output:**
 ```
 Available Tools:
-  calculator/add - Add two numbers
-    Parameters:
-      a: number (required) - First number
-      b: number (required) - Second number
+- calculator_add: Add two numbers together
+- file_read: Read contents of a file
+- search_web: Search the web for information
 
-  file/read - Read file contents
-    Parameters:  
-      path: string (required) - File path to read
-      encoding: string (optional) - File encoding (default: utf8)
-
-Found 2 tools
+Total: 3 tools
 ```
 
-#### `tools-call` - Execute Tools
+### `tools-call` - Call a Tool
+
+Execute a specific tool on the MCP server.
 
 ```bash
-# Call a tool with parameters
+# Call a tool with JSON parameters (HTTP)
 turbomcp-cli tools-call \
-    --name "calculator/add" \
-    --arguments '{"a": 5, "b": 3}' \
-    --transport stdio \
-    --command "./my-server"
+    --url http://localhost:8080/mcp \
+    --name calculator_add \
+    --arguments '{"a": 5, "b": 3}'
 
-# Call tool with file input
+# Call a tool via WebSocket
 turbomcp-cli tools-call \
-    --name "file/process" \
-    --arguments @params.json \
-    --transport http \
-    --url http://localhost:8080/mcp
+    --url ws://localhost:8080/mcp \
+    --name file_read \
+    --arguments '{"path": "/etc/hosts"}'
 
-# Call tool with timeout
+# Call a tool via STDIO
 turbomcp-cli tools-call \
-    --name "long-running-tool" \
-    --arguments '{"data": "large-dataset"}' \
-    --timeout 60s \
-    --transport stdio \
-    --command "./my-server"
+    --command "./target/debug/my-server" \
+    --name calculator_add \
+    --arguments '{"a": 5, "b": 3}'
 ```
 
-#### `resources-list` - List Available Resources
+**Example Output:**
+```json
+{
+  "result": 8,
+  "success": true
+}
+```
+
+### `schema-export` - Export Tool Schemas
+
+Export JSON schemas for all tools from an MCP server.
 
 ```bash
-# List all resources
-turbomcp-cli resources-list --transport stdio --command "./my-server"
+# Export schemas to stdout (HTTP)
+turbomcp-cli schema-export --url http://localhost:8080/mcp
 
-# Filter resources by URI pattern
-turbomcp-cli resources-list \
-    --transport stdio \
-    --command "./my-server" \
-    --filter "file://*"
-
-# Include resource templates
-turbomcp-cli resources-list \
-    --transport stdio \
-    --command "./my-server" \
-    --include-templates
-```
-
-#### `resources-read` - Read Resource Content
-
-```bash
-# Read a specific resource
-turbomcp-cli resources-read \
-    --uri "file:///etc/hosts" \
-    --transport stdio \
-    --command "./my-server"
-
-# Read multiple resources
-turbomcp-cli resources-read \
-    --uri "file:///var/log/app.log" \
-    --uri "file:///etc/config.yaml" \
-    --transport stdio \
-    --command "./my-server"
-
-# Read with content type detection
-turbomcp-cli resources-read \
-    --uri "file:///image.png" \
-    --binary \
-    --transport stdio \
-    --command "./my-server"
-```
-
-### Server Validation
-
-#### `server-test` - Comprehensive Server Testing
-
-```bash
-# Run full server test suite
-turbomcp-cli server-test --transport stdio --command "./my-server"
-
-# Test specific categories
-turbomcp-cli server-test \
-    --transport stdio \
-    --command "./my-server" \
-    --categories tools,resources,initialization
-
-# Generate test report
-turbomcp-cli server-test \
-    --transport stdio \
-    --command "./my-server" \
-    --report test-results.json
-
-# Run with custom test configuration
-turbomcp-cli server-test \
-    --transport stdio \
-    --command "./my-server" \
-    --config test-config.toml
-```
-
-**Example Test Config (`test-config.toml`):**
-```toml
-[server]
-timeout = "30s"
-max_retries = 3
-
-[tools]
-# Test all tools automatically
-test_all = true
-# Custom tool tests
-[[tools.custom_tests]]
-name = "calculator/add"
-parameters = { a = 5, b = 3 }
-expected_result = 8
-
-[resources]
-test_all = true
-# Test specific URI patterns
-uri_patterns = ["file://*", "http://*"]
-
-[performance]
-concurrent_requests = 10
-test_duration = "60s"
-```
-
-#### `validate` - Protocol Compliance
-
-```bash
-# Validate MCP compliance
-turbomcp-cli validate --transport stdio --command "./my-server"
-
-# Validate with specific MCP version
-turbomcp-cli validate \
-    --transport stdio \
-    --command "./my-server" \
-    --mcp-version "2025-06-18"
-
-# Validate and fix common issues
-turbomcp-cli validate \
-    --transport stdio \
-    --command "./my-server" \
-    --fix-issues
-```
-
-### Schema Management
-
-#### `schema-export` - Export Schemas
-
-```bash
-# Export all schemas
+# Export schemas to file (HTTP)
 turbomcp-cli schema-export \
-    --transport stdio \
-    --command "./my-server" \
-    --output schemas/
+    --url http://localhost:8080/mcp \
+    --output schemas.json
 
-# Export specific tool schemas
+# Export schemas from STDIO server
 turbomcp-cli schema-export \
-    --transport stdio \
-    --command "./my-server" \
-    --tools calculator/add,file/read \
-    --output schemas/tools.json
-
-# Export with documentation
-turbomcp-cli schema-export \
-    --transport stdio \
-    --command "./my-server" \
-    --include-docs \
-    --format openapi \
-    --output api-docs.yaml
+    --command "./target/debug/my-server" \
+    --output schemas.json
 ```
 
-#### `schema-validate` - Validate Schemas
-
-```bash
-# Validate schemas against MCP specification
-turbomcp-cli schema-validate \
-    --schema schemas/tools.json \
-    --spec mcp-2025-06-18
-
-# Validate and show detailed errors
-turbomcp-cli schema-validate \
-    --schema schemas/ \
-    --verbose \
-    --show-warnings
-```
-
-### Performance & Benchmarking
-
-#### `benchmark` - Performance Testing
-
-```bash
-# Basic benchmark
-turbomcp-cli benchmark \
-    --transport stdio \
-    --command "./my-server" \
-    --duration 60s
-
-# Concurrent request benchmark
-turbomcp-cli benchmark \
-    --transport stdio \
-    --command "./my-server" \
-    --concurrent 10 \
-    --requests 1000
-
-# Tool-specific benchmark
-turbomcp-cli benchmark \
-    --transport stdio \
-    --command "./my-server" \
-    --tool "calculator/add" \
-    --arguments '{"a": 5, "b": 3}' \
-    --concurrent 5 \
-    --duration 30s
-```
-
-**Example Benchmark Output:**
-```
-TurboMCP Benchmark Results
-==========================
-
-Server: ./my-server (stdio)
-Duration: 60s
-Concurrent Connections: 10
-
-Results:
-  Total Requests: 15,429
-  Successful: 15,429 (100.0%)
-  Failed: 0 (0.0%)
-  
-  Requests/sec: 257.15 (avg)
-  Response Time: 38.9ms (avg)
-  
-  Percentiles:
-    50th: 32ms
-    95th: 78ms  
-    99th: 156ms
-    99.9th: 312ms
-
-Memory Usage:
-  Peak RSS: 12.3 MB
-  Average: 8.7 MB
-```
-
-#### `profile` - Resource Profiling
-
-```bash
-# Memory profiling
-turbomcp-cli profile memory \
-    --transport stdio \
-    --command "./my-server" \
-    --duration 60s \
-    --output memory-profile.json
-
-# CPU profiling
-turbomcp-cli profile cpu \
-    --transport stdio \
-    --command "./my-server" \
-    --duration 30s \
-    --flamegraph profile.svg
-```
-
-### Development Tools
-
-#### `scaffold` - Project Scaffolding
-
-```bash
-# Create new MCP server project
-turbomcp-cli scaffold new-server \
-    --name my-mcp-server \
-    --template basic \
-    --language rust
-
-# Create advanced server with features
-turbomcp-cli scaffold new-server \
-    --name enterprise-server \
-    --template enterprise \
-    --features oauth,metrics,health-checks
-
-# Add tools to existing server
-turbomcp-cli scaffold add-tool \
-    --name calculator \
-    --description "Basic calculator tool" \
-    --parameters a:number,b:number
-```
-
-#### `dev` - Development Server
-
-```bash
-# Run development server with hot reload
-turbomcp-cli dev \
-    --server ./my-server \
-    --watch \
-    --reload-on-change
-
-# Development server with debugging
-turbomcp-cli dev \
-    --server ./my-server \
-    --debug \
-    --log-level trace \
-    --log-format json
-```
-
-### Configuration Management
-
-#### `config` - Configuration Management
-
-```bash
-# Generate default configuration
-turbomcp-cli config init --output turbomcp.toml
-
-# Validate configuration
-turbomcp-cli config validate --config turbomcp.toml
-
-# Show effective configuration
-turbomcp-cli config show --config turbomcp.toml --resolved
-```
-
-**Example Configuration (`turbomcp.toml`):**
-```toml
-[server]
-name = "my-mcp-server"
-version = "1.0.0"
-transport = "stdio"
-
-[development]
-hot_reload = true
-debug_logging = true
-test_on_change = true
-
-[testing]
-timeout = "30s"
-max_concurrent = 10
-test_categories = ["tools", "resources", "initialization"]
-
-[performance]
-benchmark_duration = "60s"
-benchmark_concurrent = 5
-memory_limit = "100MB"
-
-[deployment]
-health_checks = true
-metrics_enabled = true
-graceful_shutdown = true
+**Example Output:**
+```json
+{
+  "tools": [
+    {
+      "name": "calculator_add",
+      "description": "Add two numbers together",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "a": {"type": "number"},
+          "b": {"type": "number"}
+        },
+        "required": ["a", "b"]
+      }
+    }
+  ]
+}
 ```
 
 ## Transport Support
 
-### STDIO Transport
+The CLI supports three transport methods:
+
+### HTTP/HTTPS
+```bash
+turbomcp-cli tools-list --url http://localhost:8080/mcp
+turbomcp-cli tools-list --url https://api.example.com/mcp
+```
+
+### WebSocket
+```bash
+turbomcp-cli tools-list --url ws://localhost:8080/mcp
+turbomcp-cli tools-list --url wss://api.example.com/mcp
+```
+
+### STDIO (Standard Input/Output)
+```bash
+# Using --command option
+turbomcp-cli tools-list --command "./my-server"
+turbomcp-cli tools-list --command "python server.py"
+
+# Or specify path in --url (auto-detected)
+turbomcp-cli tools-list --url "./my-server"
+```
+
+**Transport Auto-Detection:**
+- URLs starting with `http://`, `https://` → HTTP transport
+- URLs starting with `ws://`, `wss://` → WebSocket transport  
+- `--command` option or executable paths → STDIO transport
+
+## Examples
 
 ```bash
-# Direct command execution
-turbomcp-cli tools-list --transport stdio --command "./server"
+# List tools from HTTP server
+turbomcp-cli tools-list --url http://localhost:8080/mcp
 
-# With arguments
-turbomcp-cli tools-list --transport stdio --command "python3" --args "-m,my_server"
+# Call calculator tool via STDIO
+turbomcp-cli tools-call \
+  --command "./target/debug/calculator-server" \
+  --name calculator_add \
+  --arguments '{"a": 10, "b": 5}'
 
-# With working directory
+# Export all schemas to file via WebSocket
+turbomcp-cli schema-export \
+  --url ws://localhost:8080/mcp \
+  --output my-server-schemas.json
+
+# Test STDIO server with authentication
 turbomcp-cli tools-list \
-    --transport stdio \
-    --command "./server" \
-    --working-dir "/path/to/server"
-```
-
-### HTTP Transport
-
-```bash
-# Basic HTTP connection
-turbomcp-cli tools-list --transport http --url "http://localhost:8080/mcp"
-
-# With authentication
-turbomcp-cli tools-list \
-    --transport http \
-    --url "https://api.example.com/mcp" \
-    --header "Authorization: Bearer $TOKEN"
-
-# With custom headers
-turbomcp-cli tools-list \
-    --transport http \
-    --url "http://localhost:8080/mcp" \
-    --header "X-API-Version: v1" \
-    --header "X-Client: turbomcp-cli"
-```
-
-### WebSocket Transport
-
-```bash
-# WebSocket connection
-turbomcp-cli tools-list --transport websocket --url "ws://localhost:8080/mcp"
-
-# Secure WebSocket
-turbomcp-cli tools-list \
-    --transport websocket \
-    --url "wss://api.example.com/mcp" \
-    --header "Authorization: Bearer $TOKEN"
-```
-
-### TCP Transport
-
-```bash
-# TCP connection
-turbomcp-cli tools-list --transport tcp --address "localhost:8080"
-
-# With connection timeout
-turbomcp-cli tools-list \
-    --transport tcp \
-    --address "localhost:8080" \
-    --timeout 30s
-```
-
-### Unix Socket Transport
-
-```bash
-# Unix socket connection
-turbomcp-cli tools-list --transport unix --socket "/tmp/mcp.sock"
-
-# With permissions
-turbomcp-cli tools-list \
-    --transport unix \
-    --socket "/tmp/mcp.sock" \
-    --permissions 660
-```
-
-## Output Formats
-
-### JSON Output
-
-```bash
-# JSON output for tools
-turbomcp-cli tools-list \
-    --transport stdio \
-    --command "./server" \
-    --output json | jq '.tools[0].name'
-
-# Pretty-printed JSON
-turbomcp-cli tools-list \
-    --transport stdio \
-    --command "./server" \
-    --output json-pretty
-```
-
-### Table Output
-
-```bash
-# Table format (default)
-turbomcp-cli tools-list --transport stdio --command "./server" --output table
-
-# Custom table columns
-turbomcp-cli tools-list \
-    --transport stdio \
-    --command "./server" \
-    --output table \
-    --columns name,description,parameters
-```
-
-### CSV Output
-
-```bash
-# CSV export
-turbomcp-cli tools-list \
-    --transport stdio \
-    --command "./server" \
-    --output csv > tools.csv
-
-# Custom CSV delimiter
-turbomcp-cli tools-list \
-    --transport stdio \
-    --command "./server" \
-    --output csv \
-    --delimiter ";" > tools.csv
-```
-
-## Advanced Usage
-
-### Batch Operations
-
-```bash
-# Run multiple commands from file
-turbomcp-cli batch --commands commands.txt
-
-# Example commands.txt:
-# tools-list --transport stdio --command "./server1"
-# tools-list --transport stdio --command "./server2" 
-# benchmark --transport stdio --command "./server1" --duration 30s
-```
-
-### Pipeline Integration
-
-```bash
-# Use with CI/CD pipelines
-turbomcp-cli validate \
-    --transport stdio \
-    --command "./server" \
-    --exit-code \
-    --output junit > test-results.xml
-
-# Health check integration
-turbomcp-cli health-check \
-    --transport http \
-    --url "http://localhost:8080/mcp" \
-    --timeout 10s \
-    --exit-code
-```
-
-### Custom Scripts
-
-```bash
-# Run custom test scripts
-turbomcp-cli script run test-suite.js \
-    --transport stdio \
-    --command "./server"
-
-# JavaScript test script example (test-suite.js):
-// Test server initialization
-const server = await connect();
-await server.initialize();
-
-// Test tools
-const tools = await server.listTools();
-assert(tools.length > 0, "Server should have tools");
-
-// Test specific tool
-const result = await server.callTool("calculator/add", {a: 5, b: 3});
-assert(result === 8, "Calculator should work");
-```
-
-## Configuration Files
-
-### Global Configuration
-
-```bash
-# Location: ~/.config/turbomcp/config.toml
-[defaults]
-transport = "stdio"
-timeout = "30s"
-output = "table"
-
-[stdio]
-default_args = []
-default_working_dir = "."
-
-[http]
-default_headers = ["User-Agent: turbomcp-cli/1.0"]
-verify_ssl = true
-
-[testing]
-concurrent_requests = 5
-test_timeout = "60s"
-```
-
-### Project Configuration
-
-```bash
-# Location: ./turbomcp.toml (project root)
-[server]
-command = "./target/debug/my-server"
-transport = "stdio"
-
-[development]
-watch_files = ["src/**/*.rs", "Cargo.toml"]
-test_on_change = true
-
-[testing]
-test_categories = ["initialization", "tools", "resources"]
-custom_tests = "tests/integration.toml"
-```
-
-## Integration Examples
-
-### CI/CD Pipeline
-
-```yaml
-# .github/workflows/mcp-test.yml
-name: MCP Server Tests
-
-on: [push, pull_request]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      
-      - name: Install TurboMCP CLI
-        run: cargo install turbomcp-cli
-        
-      - name: Build server
-        run: cargo build --release
-        
-      - name: Test MCP server
-        run: |
-          turbomcp-cli validate \
-            --transport stdio \
-            --command "./target/release/my-server" \
-            --exit-code
-            
-      - name: Benchmark server
-        run: |
-          turbomcp-cli benchmark \
-            --transport stdio \
-            --command "./target/release/my-server" \
-            --duration 30s \
-            --report benchmark.json
-            
-      - name: Upload results
-        uses: actions/upload-artifact@v3
-        with:
-          name: test-results
-          path: |
-            benchmark.json
-```
-
-### Docker Integration
-
-```dockerfile
-FROM rust:1.89 as builder
-
-# Install TurboMCP CLI
-RUN cargo install turbomcp-cli
-
-# Build server
-COPY . /app
-WORKDIR /app
-RUN cargo build --release
-
-# Test server during build
-RUN turbomcp-cli validate \
-    --transport stdio \
-    --command "./target/release/server" \
-    --exit-code
-
-FROM debian:bookworm-slim
-COPY --from=builder /app/target/release/server /usr/local/bin/
-COPY --from=builder /usr/local/cargo/bin/turbomcp-cli /usr/local/bin/
-
-# Health check using CLI
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD turbomcp-cli health-check \
-    --transport stdio \
-    --command "/usr/local/bin/server" \
-    --timeout 5s \
-    --exit-code
-
-ENTRYPOINT ["/usr/local/bin/server"]
-```
-
-## Development
-
-### Building from Source
-
-```bash
-git clone https://github.com/Epistates/turbomcp.git
-cd turbomcp/crates/turbomcp-cli
-cargo build --release
-```
-
-### Running Tests
-
-```bash
-# Unit tests
-cargo test
-
-# Integration tests
-cargo test --test integration
-
-# Test with different transports
-cargo test --features all-transports
+  --command "python my-server.py" \
+  --auth "bearer-token-here" \
+  --json
 ```
 
 ## Related Tools
@@ -769,12 +221,6 @@ cargo test --features all-transports
 - **[turbomcp-server](../turbomcp-server/)** - Server implementation  
 - **[turbomcp-client](../turbomcp-client/)** - Client implementation
 - **[turbomcp-transport](../turbomcp-transport/)** - Transport protocols
-
-## External Resources
-
-- **[MCP Specification](https://modelcontextprotocol.io/)** - Official protocol specification
-- **[Claude Desktop](https://claude.ai/desktop)** - AI assistant with MCP support
-- **[JSON-RPC 2.0](https://www.jsonrpc.org/specification)** - Underlying RPC protocol
 
 ## License
 

@@ -36,7 +36,7 @@ use tokio::runtime::Runtime;
 #[command(
     name = "turbomcp-cli",
     version,
-    about = "TurboMCP command-line interface"
+    about = "Command-line interface for interacting with MCP servers - list tools, call tools, and export schemas."
 )]
 pub struct Cli {
     /// Subcommand to run
@@ -48,19 +48,29 @@ pub struct Cli {
 #[derive(Subcommand, Debug)]
 pub enum Commands {
     /// List tools from a running server
+    #[command(name = "tools-list")]
     ToolsList(Connection),
-    /// Call a tool on a running server
+    /// Call a tool on a running server  
+    #[command(name = "tools-call")]
     ToolsCall {
         #[command(flatten)]
         conn: Connection,
         /// Tool name
+        #[arg(long)]
         name: String,
         /// Arguments as JSON (object)
         #[arg(long, default_value = "{}")]
         arguments: String,
     },
     /// Export tool schemas from a running server
-    SchemaExport(Connection),
+    #[command(name = "schema-export")]
+    SchemaExport {
+        #[command(flatten)]
+        conn: Connection,
+        /// Output file path (if not specified, outputs to stdout)
+        #[arg(long)]
+        output: Option<String>,
+    },
 }
 
 /// Run the CLI application
@@ -85,8 +95,8 @@ pub fn run_cli() {
                     std::process::exit(1);
                 }
             }
-            Commands::SchemaExport(conn) => {
-                if let Err(e) = cmd_schema_export(conn).await {
+            Commands::SchemaExport { conn, output } => {
+                if let Err(e) = cmd_schema_export(conn, output).await {
                     eprintln!("error: {e}");
                     std::process::exit(1);
                 }
@@ -98,12 +108,15 @@ pub fn run_cli() {
 /// Connection configuration for connecting to MCP servers
 #[derive(Args, Debug, Clone)]
 pub struct Connection {
-    /// Transport: stdio | http | ws
-    #[arg(long, value_enum, default_value_t = TransportKind::Stdio)]
-    pub transport: TransportKind,
-    /// Server URL for http/ws (ignored for stdio)
+    /// Transport protocol (stdio, http, ws) - auto-detected if not specified
+    #[arg(long, value_enum)]
+    pub transport: Option<TransportKind>,
+    /// Server URL for http/ws or command for stdio
     #[arg(long, default_value = "http://localhost:8080/mcp")]
     pub url: String,
+    /// Command to execute for stdio transport (overrides --url if provided)
+    #[arg(long)]
+    pub command: Option<String>,
     /// Bearer token or API key
     #[arg(long)]
     pub auth: Option<String>,
@@ -113,7 +126,7 @@ pub struct Connection {
 }
 
 /// Available transport types for connecting to MCP servers
-#[derive(Debug, Clone, ValueEnum)]
+#[derive(Debug, Clone, ValueEnum, PartialEq)]
 pub enum TransportKind {
     /// Standard input/output transport
     Stdio,
@@ -123,11 +136,29 @@ pub enum TransportKind {
     Ws,
 }
 
+/// Determine transport based on explicit setting or auto-detection
+fn determine_transport(conn: &Connection) -> TransportKind {
+    // Use explicit transport if provided
+    if let Some(transport) = &conn.transport {
+        return transport.clone();
+    }
+    
+    // Auto-detect based on command/URL patterns
+    if conn.command.is_some() || (!conn.url.starts_with("http://") && !conn.url.starts_with("https://") && !conn.url.starts_with("ws://") && !conn.url.starts_with("wss://")) {
+        TransportKind::Stdio
+    } else if conn.url.starts_with("ws://") || conn.url.starts_with("wss://") {
+        TransportKind::Ws
+    } else {
+        TransportKind::Http
+    }
+}
+
 pub async fn cmd_tools_list(conn: Connection) -> Result<(), String> {
-    match conn.transport {
-        TransportKind::Http => http_list_tools(&conn).await,
-        TransportKind::Ws => ws_list_tools(&conn).await,
+    let transport = determine_transport(&conn);
+    match transport {
         TransportKind::Stdio => stdio_list_tools(&conn).await,
+        TransportKind::Ws => ws_list_tools(&conn).await,
+        TransportKind::Http => http_list_tools(&conn).await,
     }
 }
 
@@ -136,19 +167,36 @@ pub async fn cmd_tools_call(
     name: String,
     arguments: String,
 ) -> Result<(), String> {
-    match conn.transport {
-        TransportKind::Http => http_call_tool(&conn, name, arguments).await,
-        TransportKind::Ws => ws_call_tool(&conn, name, arguments).await,
+    let transport = determine_transport(&conn);
+    match transport {
         TransportKind::Stdio => stdio_call_tool(&conn, name, arguments).await,
+        TransportKind::Ws => ws_call_tool(&conn, name, arguments).await,
+        TransportKind::Http => http_call_tool(&conn, name, arguments).await,
     }
 }
 
-pub async fn cmd_schema_export(conn: Connection) -> Result<(), String> {
-    match conn.transport {
-        TransportKind::Http => http_schema_export(&conn).await,
-        TransportKind::Ws => ws_schema_export(&conn).await,
-        TransportKind::Stdio => stdio_schema_export(&conn).await,
+pub async fn cmd_schema_export(conn: Connection, output_path: Option<String>) -> Result<(), String> {
+    // Get schema data
+    let transport = determine_transport(&conn);
+    let schema_data = match transport {
+        TransportKind::Stdio => stdio_get_schemas(&conn).await?,
+        TransportKind::Ws => ws_get_schemas(&conn).await?,
+        TransportKind::Http => http_get_schemas(&conn).await?,
+    };
+    
+    // Output to file or stdout
+    if let Some(path) = output_path {
+        use std::fs;
+        let pretty_json = serde_json::to_string_pretty(&schema_data)
+            .map_err(|e| format!("Failed to format JSON: {e}"))?;
+        fs::write(&path, pretty_json)
+            .map_err(|e| format!("Failed to write to {}: {e}", path))?;
+        eprintln!("Schemas exported to {}", path);
+    } else {
+        output(&conn, &schema_data)?;
     }
+    
+    Ok(())
 }
 
 async fn http_list_tools(conn: &Connection) -> Result<(), String> {
@@ -168,8 +216,8 @@ async fn http_call_tool(conn: &Connection, name: String, arguments: String) -> R
     output(conn, &res)
 }
 
-async fn http_schema_export(conn: &Connection) -> Result<(), String> {
-    // List, then print each tool's inputSchema
+async fn http_get_schemas(conn: &Connection) -> Result<serde_json::Value, String> {
+    // List, then return each tool's inputSchema
     let req = json!({"jsonrpc":"2.0","id":"1","method":"tools/list"});
     let res = http_post(conn, req).await?;
     if let Some(result) = res.get("result")
@@ -181,9 +229,9 @@ async fn http_schema_export(conn: &Connection) -> Result<(), String> {
             let schema = t.get("inputSchema").cloned().unwrap_or(json!({}));
             out.push(json!({"name": name, "schema": schema}));
         }
-        return output(conn, &json!({"schemas": out}));
+        return Ok(json!({"schemas": out}));
     }
-    output(conn, &res)
+    Ok(res)
 }
 
 async fn http_post(
@@ -239,7 +287,7 @@ async fn ws_call_tool(conn: &Connection, name: String, arguments: String) -> Res
     output(conn, &response)
 }
 
-async fn ws_schema_export(conn: &Connection) -> Result<(), String> {
+async fn ws_get_schemas(conn: &Connection) -> Result<serde_json::Value, String> {
     use serde_json::json;
 
     let request = json!({
@@ -264,9 +312,9 @@ async fn ws_schema_export(conn: &Connection) -> Result<(), String> {
             let schema = tool.get("inputSchema").cloned().unwrap_or(json!({}));
             out.push(json!({"name": name, "schema": schema}));
         }
-        return output(conn, &json!({"schemas": out}));
+        return Ok(json!({"schemas": out}));
     }
-    output(conn, &response)
+    Ok(response)
 }
 
 async fn ws_send_request(
@@ -344,7 +392,7 @@ async fn stdio_call_tool(conn: &Connection, name: String, arguments: String) -> 
     output(conn, &response)
 }
 
-async fn stdio_schema_export(conn: &Connection) -> Result<(), String> {
+async fn stdio_get_schemas(conn: &Connection) -> Result<serde_json::Value, String> {
     use serde_json::json;
 
     let request = json!({
@@ -369,9 +417,9 @@ async fn stdio_schema_export(conn: &Connection) -> Result<(), String> {
             let schema = tool.get("inputSchema").cloned().unwrap_or(json!({}));
             out.push(json!({"name": name, "schema": schema}));
         }
-        return output(conn, &json!({"schemas": out}));
+        return Ok(json!({"schemas": out}));
     }
-    output(conn, &response)
+    Ok(response)
 }
 
 async fn stdio_send_request(
@@ -381,8 +429,9 @@ async fn stdio_send_request(
     use std::io::{BufRead, BufReader, Write};
     use std::process::{Command, Stdio};
 
-    // Execute the command specified in conn.url as a STDIO MCP server
-    let mut parts = conn.url.split_whitespace();
+    // Use --command option if provided, otherwise use --url
+    let command_str = conn.command.as_deref().unwrap_or(&conn.url);
+    let mut parts = command_str.split_whitespace();
     let command = parts
         .next()
         .ok_or("No command specified for STDIO transport")?;
@@ -402,13 +451,34 @@ async fn stdio_send_request(
         serde_json::to_string(&request).map_err(|e| format!("Failed to serialize request: {e}"))?;
     writeln!(stdin, "{request_str}").map_err(|e| format!("Failed to write request: {e}"))?;
 
-    // Read response
+    // Read response from stdout while discarding stderr
     let stdout = child.stdout.take().ok_or("Failed to get stdout handle")?;
     let mut reader = BufReader::new(stdout);
     let mut response_line = String::new();
-    reader
-        .read_line(&mut response_line)
-        .map_err(|e| format!("Failed to read response: {e}"))?;
+    
+    // Read lines until we get valid JSON (ignore log lines)
+    loop {
+        response_line.clear();
+        let bytes_read = reader
+            .read_line(&mut response_line)
+            .map_err(|e| format!("Failed to read response: {e}"))?;
+            
+        if bytes_read == 0 {
+            return Err("No JSON response received from server".to_string());
+        }
+        
+        // Try to parse as JSON - if it works, we found our response
+        if let Ok(_) = serde_json::from_str::<serde_json::Value>(&response_line) {
+            break;
+        }
+        
+        // If line starts with '{' it might be JSON, try it anyway
+        if response_line.trim().starts_with('{') {
+            break;
+        }
+        
+        // Otherwise it's probably a log line, continue reading
+    }
 
     // Wait for process to complete
     let output = child

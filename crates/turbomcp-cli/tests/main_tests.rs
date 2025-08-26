@@ -36,7 +36,7 @@ fn test_cli_help_output() {
     );
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("TurboMCP command-line interface"));
+    assert!(stdout.contains("Command-line interface for interacting with MCP servers"));
     assert!(stdout.contains("tools-list"));
     assert!(stdout.contains("tools-call"));
     assert!(stdout.contains("schema-export"));
@@ -175,6 +175,7 @@ fn test_tools_call_with_invalid_json() {
             "http",
             "--url",
             "http://localhost:8080/test",
+            "--name",
             "test_tool",
             "--arguments",
             "invalid json",
