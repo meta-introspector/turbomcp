@@ -1,0 +1,122 @@
+[package]
+name = "turbomcp"
+version = "1.0.0"
+edition = "2024"
+authors = ["Nicholas Paterno <nick@epistates.com>"]
+description = "Rust SDK for Model Context Protocol (MCP) with ergonomic macros and SIMD acceleration"
+license = "MIT"
+repository = "https://github.com/Epistates/turbomcp"
+homepage = "https://github.com/Epistates/turbomcp"
+documentation = "https://docs.rs/turbomcp"
+readme = "README.md"
+keywords = ["mcp", "protocol", "sdk", "llm", "ai"]
+categories = ["development-tools", "network-programming", "asynchronous", "web-programming"]
+rust-version = "1.89.0"
+
+[lints]
+workspace = true
+
+
+[dependencies]
+# Core dependencies
+proc-macro2 = "1.0"
+quote = "1.0"
+syn = { version = "2.0", features = ["full", "extra-traits"] }
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+async-trait = "0.1"
+thiserror = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Database dependencies (for examples)
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "sqlite", "chrono", "uuid"], optional = true }
+
+# Transport dependencies
+reqwest = { version = "0.12", features = ["json", "stream"] }
+chrono = { version = "0.4", features = ["serde"] }
+fastrand = "2.0"
+tokio-util = "0.7"
+tokio-stream = "0.1"
+futures = "0.3"
+
+# HTTP server for SSE support
+axum = { version = "0.7", features = ["ws"] }
+tower-http = { version = "0.5", features = ["cors", "compression-gzip", "set-header"] }
+
+# Authentication dependencies - using battle-tested OAuth2 library
+oauth2 = "4.4"
+base64 = "0.22"
+sha2 = "0.10"
+urlencoding = "2.1"
+
+# JSON Schema generation
+schemars = { version = "0.8", features = ["chrono", "uuid1"], optional = true }
+regex = { version = "1.0", optional = true }
+once_cell = "1.19"
+inventory = "0.3"
+uuid = { version = "1.0", features = ["v4", "serde"] }
+
+# SIMD dependencies
+simd-json = { workspace = true, optional = true }
+sonic-rs = { workspace = true, optional = true }
+
+# HTTP dependencies
+http = "1.0"
+
+# Internal dependencies
+turbomcp-core = { version = "1.0.0", path = "../turbomcp-core", optional = true, features = ["simd"] }
+turbomcp-protocol = { version = "1.0.0", path = "../turbomcp-protocol", optional = true }
+turbomcp-transport = { version = "1.0.0", path = "../turbomcp-transport", optional = true }
+turbomcp-server = { version = "1.0.0", path = "../turbomcp-server", optional = true }
+turbomcp-macros = { version = "1.0.0", path = "../turbomcp-macros", optional = true }
+
+[dev-dependencies]
+tokio-test = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
+criterion = { version = "0.5", features = ["html_reports"] }
+tracing-subscriber = "0.3"
+tempfile = "3.0"
+rand = "0.8"
+fxhash = "0.2"
+walkdir = { workspace = true }
+
+[features]
+default = ["full", "simd"]  # Full includes all transports for convenience
+full = [
+    "schema-generation",
+    "context-injection", 
+    "uri-templates",
+    "database",
+    "internal-deps",
+    "stdio",
+    "http",
+    "websocket",
+    "tcp",
+    "unix",
+]
+schema-generation = ["schemars"]
+context-injection = []
+uri-templates = ["regex"]
+database = ["sqlx"]
+# Transport features (progressive enhancement)
+stdio = ["turbomcp-transport/stdio", "turbomcp-server/stdio"]
+http = ["turbomcp-transport/http", "turbomcp-server/http"]
+websocket = ["turbomcp-transport/websocket", "turbomcp-server/websocket"]
+tcp = ["turbomcp-transport/tcp", "turbomcp-server/tcp"]
+unix = ["turbomcp-transport/unix", "turbomcp-server/unix"]
+# Convenience minimal features for specialized deployments
+minimal = ["internal-deps", "stdio"]  # Just STDIO - works everywhere
+network = ["internal-deps", "stdio", "tcp"]  # STDIO + TCP for network deployment  
+server-only = ["internal-deps", "tcp", "unix"]  # TCP + Unix for server deployment (no STDIO)
+all-transports = ["stdio", "http", "websocket", "tcp", "unix"]  # All transports without other features
+internal-deps = ["turbomcp-core", "turbomcp-protocol", "turbomcp-transport", "turbomcp-server", "turbomcp-macros"]
+simd = ["turbomcp-core/simd", "simd-json", "sonic-rs"]
+
+## No examples currently shipped from the framework crate. See top-level examples.
+
+
+[package.metadata.docs.rs]
+features = ["full"]
+rustdoc-args = ["--cfg", "docsrs"]

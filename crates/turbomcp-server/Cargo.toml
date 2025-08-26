@@ -1,0 +1,51 @@
+[package]
+name = "turbomcp-server"
+version = "1.0.0"
+edition = "2024"
+authors = ["Nicholas Paterno <nick@epistates.com>"]
+description = "Fast MCP server implementation with middleware, routing, and lifecycle management"
+license = "MIT"
+repository = "https://github.com/Epistates/turbomcp"
+keywords = ["mcp", "server", "middleware", "routing", "lifecycle"]
+categories = ["development-tools", "web-programming", "asynchronous"]
+readme = "README.md"
+rust-version = "1.89.0"
+
+[dependencies]
+turbomcp-core = { version = "1.0.0", path = "../turbomcp-core" }
+turbomcp-protocol = { version = "1.0.0", path = "../turbomcp-protocol" }
+turbomcp-transport = { version = "1.0.0", path = "../turbomcp-transport" }
+turbomcp-macros = { version = "1.0.0", path = "../turbomcp-macros" }
+async-trait = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+dashmap = "5.5"
+parking_lot = "0.12"
+futures = "0.3"
+anyhow = "1.0"
+bytes = { workspace = true }
+regex = "1.10"
+jsonschema = "0.17"
+
+[features]
+default = ["auth", "health-checks", "metrics"]
+auth = []
+health-checks = []
+hot-reload = []
+metrics = []
+middleware = []
+graceful-shutdown = []
+# Transport features (progressive enhancement)
+stdio = ["turbomcp-transport/stdio"]
+http = ["turbomcp-transport/http"]
+websocket = ["turbomcp-transport/websocket"] 
+tcp = ["turbomcp-transport/tcp"]
+unix = ["turbomcp-transport/unix"]
+# Convenience feature bundles
+all-transports = ["stdio", "http", "websocket", "tcp", "unix"]

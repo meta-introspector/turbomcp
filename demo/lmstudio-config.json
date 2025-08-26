@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "turbomcp-dev-assistant": {
+      "command": "/Users/Epistates/turbomcp/demo/target/release/turbomcp-demo",
+      "env": {
+        "RUST_LOG": "info"
+      },
+      "description": "TurboMCP Comprehensive Demo - Full tool suite with code analysis, build automation, and AI-assisted development"
+    }
+  }
+}
