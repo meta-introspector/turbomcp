@@ -58,7 +58,7 @@ pub fn generate_error(input: TokenStream) -> TokenStream {
     let args = &format_args.args;
 
     let expanded = quote! {
-        ::turbomcp_server::ServerError::handler(format!(#format_string, #(#args),*))
+        ::turbomcp_core::Error::handler(format!(#format_string, #(#args),*))
     };
 
     TokenStream::from(expanded)

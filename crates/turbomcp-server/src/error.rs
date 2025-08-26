@@ -371,5 +371,57 @@ impl ErrorContext {
     }
 }
 
+// Conversion from core errors to server errors
+impl From<Box<turbomcp_core::Error>> for ServerError {
+    fn from(core_error: Box<turbomcp_core::Error>) -> Self {
+        use turbomcp_core::ErrorKind;
+        
+        match core_error.kind {
+            ErrorKind::Handler => Self::Handler {
+                message: core_error.message,
+                context: core_error.context.operation,
+            },
+            ErrorKind::Authentication => Self::Authentication {
+                message: core_error.message,
+                method: None,
+            },
+            ErrorKind::PermissionDenied => Self::Authorization {
+                message: core_error.message,
+                resource: None,
+            },
+            ErrorKind::NotFound => Self::NotFound {
+                resource: core_error.message,
+            },
+            ErrorKind::BadRequest | ErrorKind::Validation => Self::Handler {
+                message: format!("Validation error: {}", core_error.message),
+                context: None,
+            },
+            ErrorKind::Timeout => Self::Timeout {
+                operation: core_error.context.operation.unwrap_or_else(|| "unknown".to_string()),
+                timeout_ms: 30000, // Default timeout
+            },
+            ErrorKind::RateLimited => Self::RateLimit {
+                message: core_error.message,
+                retry_after: None,
+            },
+            ErrorKind::Configuration => Self::Configuration {
+                message: core_error.message,
+                key: None,
+            },
+            ErrorKind::Transport => Self::Internal(format!("Transport error: {}", core_error.message)),
+            ErrorKind::Serialization => Self::Internal(format!("Serialization error: {}", core_error.message)),
+            ErrorKind::Protocol => Self::Internal(format!("Protocol error: {}", core_error.message)),
+            ErrorKind::Unavailable => Self::ResourceExhausted {
+                resource: "service".to_string(),
+                current: None,
+                max: None,
+            },
+            ErrorKind::ExternalService => Self::Internal(format!("External service error: {}", core_error.message)),
+            ErrorKind::Cancelled => Self::Internal(format!("Operation cancelled: {}", core_error.message)),
+            ErrorKind::Internal => Self::Internal(core_error.message),
+        }
+    }
+}
+
 // Note: McpError conversion is handled by the turbomcp crate
 // since McpError wraps ServerError, not the other way around

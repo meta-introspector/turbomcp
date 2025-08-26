@@ -452,6 +452,14 @@ impl From<turbomcp_transport::core::TransportError> for McpError {
     }
 }
 
+impl From<Box<turbomcp_core::Error>> for McpError {
+    fn from(core_error: Box<turbomcp_core::Error>) -> Self {
+        // Convert core error to server error first, then to McpError
+        let server_error: turbomcp_server::ServerError = core_error.into();
+        Self::Server(server_error)
+    }
+}
+
 impl Clone for McpError {
     fn clone(&self) -> Self {
         match self {

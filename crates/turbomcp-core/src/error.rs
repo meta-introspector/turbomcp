@@ -129,6 +129,9 @@ pub enum ErrorKind {
 
     /// Operation was cancelled
     Cancelled,
+
+    /// Handler execution error
+    Handler,
 }
 
 /// Rich contextual information for errors
@@ -267,6 +270,11 @@ impl Error {
         Self::new(ErrorKind::Cancelled, message)
     }
 
+    /// Create a handler error - for compatibility with macro-generated code
+    pub fn handler(message: impl Into<String>) -> Box<Self> {
+        Self::new(ErrorKind::Handler, message)
+    }
+
     /// Add context to this error
     #[must_use]
     pub fn with_context(
@@ -355,7 +363,8 @@ impl Error {
             ErrorKind::Internal
             | ErrorKind::Configuration
             | ErrorKind::Serialization
-            | ErrorKind::Protocol => 500,
+            | ErrorKind::Protocol
+            | ErrorKind::Handler => 500,
             ErrorKind::Transport | ErrorKind::ExternalService | ErrorKind::Unavailable => 503,
             ErrorKind::Cancelled => 499, // Client closed request
         }
@@ -378,6 +387,7 @@ impl Error {
             ErrorKind::Configuration => -32008,  // Custom: Configuration error
             ErrorKind::ExternalService => -32009, // Custom: External service error
             ErrorKind::Cancelled => -32010,      // Custom: Operation cancelled
+            ErrorKind::Handler => -32011,        // Custom: Handler error
         }
     }
 }
@@ -431,6 +441,7 @@ impl ErrorKind {
             Self::Configuration => "Configuration error",
             Self::ExternalService => "External service error",
             Self::Cancelled => "Operation cancelled",
+            Self::Handler => "Handler execution error",
         }
     }
 }

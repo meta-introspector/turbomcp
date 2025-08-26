@@ -27,8 +27,8 @@ echo -e "${BLUE}🚀 Publishing TurboMCP Crates${NC}"
 echo "=============================="
 echo ""
 
-# Check if we're logged in
-if ! cargo login --list &> /dev/null; then
+# Check if we're logged in by testing credentials file
+if ! test -f ~/.cargo/credentials.toml; then
     echo -e "${YELLOW}⚠️  Not logged into crates.io. Please run 'cargo login' first${NC}"
     exit 1
 fi
