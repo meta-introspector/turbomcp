@@ -85,6 +85,9 @@ pub enum TransportType {
     Tcp,
     /// Unix domain socket transport
     Unix,
+    /// TLS-secured transport
+    #[cfg(feature = "tls")]
+    Tls,
     /// Child process transport
     ChildProcess,
     /// gRPC transport
@@ -121,6 +124,9 @@ pub struct TransportCapabilities {
 
     /// Whether compression is supported
     pub supports_compression: bool,
+
+    /// Whether encryption is supported
+    pub supports_encryption: bool,
 
     /// Whether streaming is supported
     pub supports_streaming: bool,
@@ -170,7 +176,7 @@ pub struct TransportConfig {
 }
 
 /// Transport message wrapper
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransportMessage {
     /// Message ID
     pub id: MessageId,
@@ -527,6 +533,7 @@ impl Default for TransportCapabilities {
         Self {
             max_message_size: Some(turbomcp_core::MAX_MESSAGE_SIZE),
             supports_compression: false,
+            supports_encryption: false,
             supports_streaming: false,
             supports_bidirectional: true,
             supports_multiplexing: false,
@@ -649,6 +656,8 @@ impl fmt::Display for TransportType {
             Self::WebSocket => write!(f, "websocket"),
             Self::Tcp => write!(f, "tcp"),
             Self::Unix => write!(f, "unix"),
+            #[cfg(feature = "tls")]
+            Self::Tls => write!(f, "tls"),
             Self::ChildProcess => write!(f, "child_process"),
             #[cfg(feature = "grpc")]
             Self::Grpc => write!(f, "grpc"),

@@ -112,6 +112,7 @@ impl ChildProcessTransport {
             max_message_size: Some(config.max_message_size),
             supports_streaming: false,
             supports_compression: false,
+            supports_encryption: false,
             supports_bidirectional: true,
             supports_multiplexing: false,
             compression_algorithms: Vec::new(),

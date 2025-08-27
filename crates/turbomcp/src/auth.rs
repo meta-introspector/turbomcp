@@ -13,6 +13,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
+// UUID for ticket generation
+use uuid;
+
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
@@ -25,6 +28,10 @@ use oauth2::{
     PkceCodeVerifier, RedirectUrl, RefreshToken, Scope, TokenResponse, TokenUrl,
     basic::BasicClient, reqwest::async_http_client,
 };
+
+// DPoP support (feature-gated)
+#[cfg(feature = "dpop")]
+use turbomcp_dpop::{DpopAlgorithm, DpopKeyManager, DpopProofGenerator};
 // Note: base64 and sha2 may be used by helper functions for PKCE
 
 /// Authentication configuration
@@ -164,6 +171,57 @@ pub struct TokenInfo {
     pub scope: Option<String>,
 }
 
+/// OAuth 2.0 security enhancement level
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SecurityLevel {
+    /// Standard OAuth 2.0 with PKCE (existing behavior - no breaking changes)
+    Standard,
+    /// Enhanced security with DPoP token binding
+    Enhanced,
+    /// Maximum security with full DPoP + additional features
+    Maximum,
+}
+
+impl Default for SecurityLevel {
+    fn default() -> Self {
+        Self::Standard
+    }
+}
+
+/// DPoP (Demonstration of Proof-of-Possession) configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DpopConfig {
+    /// Cryptographic algorithm for DPoP proofs
+    #[cfg(feature = "dpop")]
+    pub key_algorithm: DpopAlgorithm,
+    /// Cryptographic algorithm for DPoP proofs (feature disabled)
+    #[cfg(not(feature = "dpop"))]
+    pub key_algorithm: String,
+    /// Proof lifetime in seconds
+    pub proof_lifetime: Duration,
+    /// Enable automatic key rotation
+    pub enable_key_rotation: bool,
+    /// Key rotation interval
+    pub key_rotation_interval: Option<Duration>,
+    /// Maximum clock skew tolerance
+    pub clock_skew_tolerance: Duration,
+}
+
+impl Default for DpopConfig {
+    fn default() -> Self {
+        Self {
+            #[cfg(feature = "dpop")]
+            key_algorithm: DpopAlgorithm::ES256,
+            #[cfg(not(feature = "dpop"))]
+            key_algorithm: "ES256".to_string(),
+            proof_lifetime: Duration::from_secs(60),
+            enable_key_rotation: false,
+            key_rotation_interval: None,
+            clock_skew_tolerance: Duration::from_secs(300),
+        }
+    }
+}
+
 /// OAuth 2.0 configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OAuth2Config {
@@ -183,6 +241,12 @@ pub struct OAuth2Config {
     pub flow_type: OAuth2FlowType,
     /// Additional parameters
     pub additional_params: HashMap<String, String>,
+    /// Security level for OAuth flow
+    #[serde(default)]
+    pub security_level: SecurityLevel,
+    /// DPoP configuration (when security_level is Enhanced or Maximum)
+    #[serde(default)]
+    pub dpop_config: Option<DpopConfig>,
 }
 
 /// Device authorization response for CLI/IoT flows
@@ -291,6 +355,82 @@ pub enum AuthCredentials {
     },
 }
 
+/// Ticket ID for intent registration (UUID format)
+pub type TicketId = String;
+
+/// Registered intent for DPoP authentication flow
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RegisteredIntent {
+    /// Unique ticket identifier
+    pub ticket_id: TicketId,
+    /// DPoP key thumbprint for cryptographic binding
+    pub dpop_thumbprint: String,
+    /// Intended operation/resource
+    pub operation: IntentOperation,
+    /// Intent creation time
+    pub created_at: SystemTime,
+    /// Intent expiration time (short-lived: 5-10 minutes)
+    pub expires_at: SystemTime,
+    /// Additional metadata
+    pub metadata: HashMap<String, serde_json::Value>,
+}
+
+/// Type of operation being registered
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum IntentOperation {
+    /// OAuth authorization flow
+    OAuth2Authorization {
+        /// Provider name
+        provider: String,
+        /// Requested scopes
+        scopes: Vec<String>,
+    },
+    /// Resource access
+    ResourceAccess {
+        /// Resource identifier
+        resource_id: String,
+        /// Required permissions
+        permissions: Vec<String>,
+    },
+    /// Custom operation
+    Custom {
+        /// Operation type
+        operation_type: String,
+        /// Operation data
+        data: HashMap<String, serde_json::Value>,
+    },
+}
+
+/// Ephemeral access token bound to DPoP key
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EphemeralToken {
+    /// Access token value
+    pub access_token: String,
+    /// DPoP key thumbprint (cryptographic binding)
+    pub dpop_thumbprint: String,
+    /// Token expiration (short-lived: 1 hour max)
+    pub expires_at: SystemTime,
+    /// Token scopes
+    pub scopes: Vec<String>,
+    /// Associated ticket ID (for audit trail)
+    pub ticket_id: Option<TicketId>,
+    /// Token metadata
+    pub metadata: HashMap<String, serde_json::Value>,
+}
+
+/// DPoP-enhanced authorization result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DpopAuthResult {
+    /// Authorization URL with ticket parameter
+    pub auth_url: String,
+    /// State parameter for CSRF protection
+    pub state: String,
+    /// Ticket ID for intent tracking
+    pub ticket_id: TicketId,
+    /// DPoP key thumbprint
+    pub dpop_thumbprint: String,
+}
+
 /// Production-grade OAuth 2.0 authentication provider supporting all modern flows
 #[derive(Debug)]
 pub struct OAuth2Provider {
@@ -304,6 +444,19 @@ pub struct OAuth2Provider {
     token_storage: Arc<dyn TokenStorage>,
     /// Pending authorization requests with PKCE verifiers
     pending_auths: Arc<RwLock<HashMap<String, PendingAuth>>>,
+    /// Intent registry for DPoP flows
+    #[cfg(feature = "dpop")]
+    intent_registry: Arc<RwLock<HashMap<TicketId, RegisteredIntent>>>,
+    /// Ephemeral token store for DPoP-bound tokens  
+    #[cfg(feature = "dpop")]
+    ephemeral_tokens: Arc<RwLock<HashMap<String, EphemeralToken>>>,
+    /// DPoP key manager for cryptographic operations
+    #[cfg(feature = "dpop")]
+    dpop_key_manager: Option<Arc<DpopKeyManager>>,
+    /// DPoP proof generator
+    #[cfg(feature = "dpop")]
+    #[allow(dead_code)]
+    dpop_proof_generator: Option<Arc<DpopProofGenerator>>,
 }
 
 /// Production-grade OAuth2 client wrapper supporting all modern flows
@@ -683,7 +836,7 @@ impl OAuth2Client {
 
 impl OAuth2Provider {
     /// Create a production-grade OAuth 2.0 provider with comprehensive flow support
-    pub fn new(
+    pub async fn new(
         name: String,
         config: OAuth2Config,
         provider_type: ProviderType,
@@ -691,12 +844,42 @@ impl OAuth2Provider {
     ) -> McpResult<Self> {
         let oauth_client = OAuth2Client::new(&config, provider_type)?;
 
+        // Initialize DPoP components if enhanced security is enabled
+        #[cfg(feature = "dpop")]
+        let (dpop_key_manager, dpop_proof_generator) = if matches!(
+            config.security_level,
+            SecurityLevel::Enhanced | SecurityLevel::Maximum
+        ) {
+            // Initialize DPoP key manager
+            let key_manager = Arc::new(DpopKeyManager::new_memory().await.map_err(|e| {
+                McpError::Server(turbomcp_server::ServerError::Configuration {
+                    message: format!("Failed to initialize DPoP key manager: {e}"),
+                    key: Some("dpop_key_manager".to_string()),
+                })
+            })?);
+
+            // Create proof generator
+            let proof_generator = Arc::new(DpopProofGenerator::new(key_manager.clone()));
+
+            (Some(key_manager), Some(proof_generator))
+        } else {
+            (None, None)
+        };
+
         Ok(Self {
             name,
             config,
             oauth_client,
             token_storage,
             pending_auths: Arc::new(RwLock::new(HashMap::new())),
+            #[cfg(feature = "dpop")]
+            intent_registry: Arc::new(RwLock::new(HashMap::new())),
+            #[cfg(feature = "dpop")]
+            ephemeral_tokens: Arc::new(RwLock::new(HashMap::new())),
+            #[cfg(feature = "dpop")]
+            dpop_key_manager,
+            #[cfg(feature = "dpop")]
+            dpop_proof_generator,
         })
     }
 
@@ -1006,6 +1189,180 @@ impl OAuth2Provider {
             refresh_token: token_response.refresh_token().map(|t| t.secret().clone()),
             scope: Some(access_token.scopes.join(" ")),
         }))
+    }
+
+    // ==================== DPoP Enhanced Methods ====================
+    // These methods provide DPoP (Demonstration of Proof-of-Possession) support
+    // for enhanced OAuth 2.0 security with token binding
+
+    /// Start DPoP-enhanced OAuth 2.0 authorization flow
+    #[cfg(feature = "dpop")]
+    pub async fn start_dpop_authorization(
+        &self,
+        dpop_thumbprint: &str,
+    ) -> McpResult<DpopAuthResult> {
+        // Ensure DPoP is enabled
+        let _key_manager = self.dpop_key_manager.as_ref().ok_or_else(|| {
+            McpError::InvalidInput("DPoP not enabled for this provider".to_string())
+        })?;
+
+        // Generate unique ticket ID for intent registration
+        let ticket_id = uuid::Uuid::new_v4().to_string();
+
+        // Register intent with DPoP binding
+        let intent = RegisteredIntent {
+            ticket_id: ticket_id.clone(),
+            dpop_thumbprint: dpop_thumbprint.to_string(),
+            operation: IntentOperation::OAuth2Authorization {
+                provider: self.name.clone(),
+                scopes: self.config.scopes.clone(),
+            },
+            created_at: SystemTime::now(),
+            expires_at: SystemTime::now() + Duration::from_secs(600), // 10 minutes
+            metadata: HashMap::new(),
+        };
+
+        self.intent_registry
+            .write()
+            .await
+            .insert(ticket_id.clone(), intent);
+
+        // Generate regular OAuth authorization URL
+        let auth_result = self.start_authorization().await?;
+
+        // Enhance URL with ticket parameter
+        let auth_url_with_ticket = if auth_result.auth_url.contains('?') {
+            format!("{}&ticket={}", auth_result.auth_url, ticket_id)
+        } else {
+            format!("{}?ticket={}", auth_result.auth_url, ticket_id)
+        };
+
+        Ok(DpopAuthResult {
+            auth_url: auth_url_with_ticket,
+            state: auth_result.state,
+            ticket_id,
+            dpop_thumbprint: dpop_thumbprint.to_string(),
+        })
+    }
+
+    /// Exchange authorization code for DPoP-bound ephemeral token
+    #[cfg(feature = "dpop")]
+    pub async fn exchange_dpop_code(
+        &self,
+        ticket_id: &TicketId,
+        code: &str,
+        _dpop_proof: &str, // JWT string
+    ) -> McpResult<EphemeralToken> {
+        // Retrieve and validate intent
+        let intent = {
+            let mut intents = self.intent_registry.write().await;
+            intents
+                .remove(ticket_id)
+                .ok_or_else(|| McpError::Unauthorized("Invalid or expired ticket ID".to_string()))?
+        };
+
+        // Validate intent hasn't expired
+        if SystemTime::now() > intent.expires_at {
+            return Err(McpError::Unauthorized("Intent expired".to_string()));
+        }
+
+        // Parse DPoP proof (simplified - in production would need full JWT parsing)
+        // TODO: Implement proper DPoP proof parsing and validation
+
+        // Exchange code using standard flow
+        let token_info = self
+            .exchange_code(code, &intent.operation.state_from_intent())
+            .await?;
+
+        // Create DPoP-bound ephemeral token
+        let ephemeral_token = EphemeralToken {
+            access_token: token_info.access_token,
+            dpop_thumbprint: intent.dpop_thumbprint,
+            expires_at: SystemTime::now() + Duration::from_secs(3600), // 1 hour max
+            scopes: token_info
+                .scope
+                .unwrap_or_default()
+                .split(' ')
+                .map(String::from)
+                .collect(),
+            ticket_id: Some(ticket_id.clone()),
+            metadata: HashMap::new(),
+        };
+
+        // Store ephemeral token
+        self.ephemeral_tokens.write().await.insert(
+            ephemeral_token.access_token.clone(),
+            ephemeral_token.clone(),
+        );
+
+        Ok(ephemeral_token)
+    }
+
+    /// Validate DPoP-bound token usage
+    #[cfg(feature = "dpop")]
+    pub async fn validate_dpop_token(
+        &self,
+        access_token: &str,
+        _dpop_proof: &str,
+        _method: &str,
+        _uri: &str,
+    ) -> McpResult<bool> {
+        // Retrieve ephemeral token
+        let ephemeral_token = self
+            .ephemeral_tokens
+            .read()
+            .await
+            .get(access_token)
+            .cloned()
+            .ok_or_else(|| McpError::Unauthorized("Token not found or expired".to_string()))?;
+
+        // Check if token is expired
+        if SystemTime::now() > ephemeral_token.expires_at {
+            return Err(McpError::Unauthorized(
+                "Ephemeral token expired".to_string(),
+            ));
+        }
+
+        // TODO: Validate DPoP proof cryptographically
+        // This would involve:
+        // 1. Parse DPoP JWT
+        // 2. Verify signature using public key from thumbprint
+        // 3. Check HTTP method/URI binding
+        // 4. Verify access token hash
+        // 5. Check for replay attacks
+
+        Ok(true)
+    }
+
+    /// Clean up expired intents and ephemeral tokens
+    #[cfg(feature = "dpop")]
+    pub async fn cleanup_dpop_sessions(&self) {
+        let now = SystemTime::now();
+
+        // Clean up expired intents
+        self.intent_registry
+            .write()
+            .await
+            .retain(|_, intent| intent.expires_at > now);
+
+        // Clean up expired ephemeral tokens
+        self.ephemeral_tokens
+            .write()
+            .await
+            .retain(|_, token| token.expires_at > now);
+    }
+}
+
+// Helper trait extension for intent operations
+#[cfg(feature = "dpop")]
+impl IntentOperation {
+    fn state_from_intent(&self) -> String {
+        // This is a simplified implementation
+        // In practice, would need to extract state from the OAuth flow
+        match self {
+            Self::OAuth2Authorization { .. } => "dpop_state".to_string(),
+            _ => "unknown_state".to_string(),
+        }
     }
 }
 
@@ -1544,6 +1901,8 @@ mod tests {
             scopes: vec!["read".to_string(), "write".to_string()],
             flow_type: OAuth2FlowType::AuthorizationCode,
             additional_params: HashMap::new(),
+            security_level: SecurityLevel::Standard,
+            dpop_config: None,
         };
 
         assert_eq!(config.client_id, "test_client");

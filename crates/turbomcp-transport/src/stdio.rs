@@ -67,6 +67,7 @@ impl StdioTransport {
             capabilities: TransportCapabilities {
                 max_message_size: Some(turbomcp_core::MAX_MESSAGE_SIZE),
                 supports_compression: false,
+                supports_encryption: false,
                 supports_streaming: true,
                 supports_bidirectional: true,
                 supports_multiplexing: false,

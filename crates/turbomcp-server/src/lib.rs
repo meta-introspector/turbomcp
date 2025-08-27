@@ -64,6 +64,7 @@ pub mod metrics;
 pub mod middleware;
 pub mod registry;
 pub mod routing;
+pub mod security;
 pub mod server;
 
 // Re-export main types for convenience
@@ -78,6 +79,7 @@ pub use middleware::{
 };
 pub use registry::{HandlerRegistry, Registry, RegistryBuilder};
 pub use routing::{RequestRouter, Route, Router};
+pub use security::{SecurityContext, SecurityEvent, SecurityMiddleware, SecurityStats};
 pub use server::{McpServer, ServerBuilder, ShutdownHandle};
 
 // Re-export protocol types
@@ -108,8 +110,8 @@ pub mod prelude {
         AuthenticationMiddleware, HealthStatus, LoggingMiddleware, McpServer, Middleware,
         MiddlewareStack, PromptHandler, RateLimitMiddleware, Registry, RegistryBuilder,
         RequestRouter, ResourceHandler, Router, SamplingHandler, SecurityHeadersConfig,
-        SecurityHeadersMiddleware, ServerBuilder, ServerConfig, ServerError, ServerLifecycle,
-        ServerResult, ToolHandler, default_config, server,
+        SecurityHeadersMiddleware, SecurityMiddleware, ServerBuilder, ServerConfig, ServerError,
+        ServerLifecycle, ServerResult, ToolHandler, default_config, server,
     };
 
     // Re-export macros

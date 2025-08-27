@@ -281,6 +281,7 @@ fn test_server_config_json_roundtrip() {
             requests_per_second: 50,
             burst_capacity: 100,
         },
+        security: SecurityConfig::default(),
         logging: LoggingConfig {
             level: "warn".to_string(),
             structured: false,

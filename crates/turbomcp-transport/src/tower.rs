@@ -255,6 +255,7 @@ impl TowerTransportAdapter {
             capabilities: TransportCapabilities {
                 max_message_size: Some(16 * 1024 * 1024), // 16MB default
                 supports_compression: true,
+                supports_encryption: false,
                 supports_streaming: true,
                 supports_bidirectional: true,
                 supports_multiplexing: true,

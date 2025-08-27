@@ -172,6 +172,7 @@ fn test_transport_capabilities_creation() {
     let capabilities = TransportCapabilities {
         max_message_size: Some(1024),
         supports_compression: true,
+        supports_encryption: false,
         supports_streaming: true,
         supports_bidirectional: false,
         supports_multiplexing: false,
@@ -375,6 +376,7 @@ fn test_transport_capabilities_feature_matrix() {
         TransportCapabilities {
             max_message_size: Some(1024 * 1024), // 1MB
             supports_compression: true,
+            supports_encryption: false,
             supports_streaming: true,
             supports_bidirectional: true,
             supports_multiplexing: true,

@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::net::IpAddr;
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -26,6 +27,8 @@ pub struct ServerConfig {
     pub timeouts: TimeoutConfig,
     /// Rate limiting configuration
     pub rate_limiting: RateLimitingConfig,
+    /// Security configuration
+    pub security: SecurityConfig,
     /// Logging configuration
     pub logging: LoggingConfig,
     /// Additional configuration
@@ -63,6 +66,99 @@ pub struct RateLimitingConfig {
     pub burst_capacity: u32,
 }
 
+/// Security configuration  
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SecurityConfig {
+    /// Enable security middleware
+    pub enabled: bool,
+    /// Rate limiting strategy
+    pub rate_limiting_strategy: RateLimitingStrategy,
+    /// DoS protection configuration
+    pub dos_protection: DoSProtectionConfig,
+    /// Circuit breaker configuration
+    pub circuit_breaker: CircuitBreakerConfig,
+    /// Security event logging
+    pub event_logging: bool,
+    /// Trusted IP addresses (bypass all security)
+    pub trusted_ips: Vec<IpAddr>,
+    /// DPoP configuration
+    pub dpop: Option<DpopSecurityConfig>,
+}
+
+/// Rate limiting strategy
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum RateLimitingStrategy {
+    /// Per-IP rate limiting
+    PerIp {
+        /// Requests allowed per second
+        requests_per_second: u32,
+        /// Burst capacity for traffic spikes
+        burst_capacity: u32,
+    },
+    /// Per-DPoP key rate limiting  
+    PerDpopKey {
+        /// Requests allowed per second
+        requests_per_second: u32,
+        /// Burst capacity for traffic spikes
+        burst_capacity: u32,
+    },
+    /// Combined IP + DPoP key limiting
+    Combined {
+        /// IP-based requests per second
+        ip_requests_per_second: u32,
+        /// IP-based burst capacity
+        ip_burst_capacity: u32,
+        /// DPoP key-based requests per second
+        dpop_requests_per_second: u32,
+        /// DPoP key-based burst capacity
+        dpop_burst_capacity: u32,
+    },
+    /// Adaptive rate limiting based on load
+    Adaptive {
+        /// Base requests per second under normal load
+        base_requests_per_second: u32,
+        /// Maximum requests per second during high load
+        max_requests_per_second: u32,
+    },
+}
+
+/// DoS protection configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DoSProtectionConfig {
+    /// Enable DoS protection
+    pub enabled: bool,
+    /// Maximum requests per minute before considering DoS
+    pub max_requests_per_minute: u32,
+    /// Block duration for suspicious IPs (in seconds)
+    pub block_duration_seconds: u64,
+    /// Suspicious activity threshold
+    pub suspicious_threshold: u32,
+}
+
+/// Circuit breaker configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CircuitBreakerConfig {
+    /// Enable circuit breakers
+    pub enabled: bool,
+    /// Failure threshold (percentage)
+    pub failure_threshold: f32,
+    /// Recovery time (in seconds)
+    pub recovery_time_seconds: u64,
+    /// Request volume threshold
+    pub request_volume_threshold: u32,
+}
+
+/// DPoP security configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DpopSecurityConfig {
+    /// Enable DPoP key tracking
+    pub key_tracking: bool,
+    /// Maximum requests per DPoP key per minute
+    pub max_requests_per_key_per_minute: u32,
+    /// Enable DPoP key rotation detection
+    pub key_rotation_detection: bool,
+}
+
 /// Logging configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LoggingConfig {
@@ -86,6 +182,7 @@ impl Default for ServerConfig {
             tls: None,
             timeouts: TimeoutConfig::default(),
             rate_limiting: RateLimitingConfig::default(),
+            security: SecurityConfig::default(),
             logging: LoggingConfig::default(),
             additional: HashMap::new(),
         }
@@ -108,6 +205,45 @@ impl Default for RateLimitingConfig {
             enabled: true,
             requests_per_second: 100,
             burst_capacity: 200,
+        }
+    }
+}
+
+impl Default for SecurityConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            rate_limiting_strategy: RateLimitingStrategy::PerIp {
+                requests_per_second: 100,
+                burst_capacity: 200,
+            },
+            dos_protection: DoSProtectionConfig::default(),
+            circuit_breaker: CircuitBreakerConfig::default(),
+            event_logging: true,
+            trusted_ips: Vec::new(),
+            dpop: None, // DPoP security disabled by default
+        }
+    }
+}
+
+impl Default for DoSProtectionConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            max_requests_per_minute: 300,
+            block_duration_seconds: 3600, // 1 hour
+            suspicious_threshold: 50,
+        }
+    }
+}
+
+impl Default for CircuitBreakerConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            failure_threshold: 0.5, // 50% failure rate
+            recovery_time_seconds: 60,
+            request_volume_threshold: 10,
         }
     }
 }
@@ -199,6 +335,47 @@ impl ConfigurationBuilder {
     /// Set log level
     pub fn log_level(mut self, level: impl Into<String>) -> Self {
         self.config.logging.level = level.into();
+        self
+    }
+
+    /// Enable security middleware
+    #[must_use]
+    pub const fn enable_security(mut self, enabled: bool) -> Self {
+        self.config.security.enabled = enabled;
+        self
+    }
+
+    /// Set security rate limiting strategy
+    #[must_use]
+    pub fn security_rate_limiting(mut self, strategy: RateLimitingStrategy) -> Self {
+        self.config.security.rate_limiting_strategy = strategy;
+        self
+    }
+
+    /// Configure DoS protection
+    #[must_use]
+    pub fn dos_protection(mut self, config: DoSProtectionConfig) -> Self {
+        self.config.security.dos_protection = config;
+        self
+    }
+
+    /// Configure circuit breaker
+    #[must_use]
+    pub fn circuit_breaker(mut self, config: CircuitBreakerConfig) -> Self {
+        self.config.security.circuit_breaker = config;
+        self
+    }
+
+    /// Add trusted IP addresses
+    pub fn trusted_ips(mut self, ips: Vec<IpAddr>) -> Self {
+        self.config.security.trusted_ips = ips;
+        self
+    }
+
+    /// Enable DPoP security features
+    #[must_use]
+    pub fn dpop_security(mut self, config: DpopSecurityConfig) -> Self {
+        self.config.security.dpop = Some(config);
         self
     }
 

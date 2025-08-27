@@ -47,6 +47,8 @@ tower-http = { version = "0.5", features = ["cors", "compression-gzip", "set-hea
 
 # Authentication dependencies - using battle-tested OAuth2 library
 oauth2 = "4.4"
+# DPoP support for enhanced OAuth security (optional)
+turbomcp-dpop = { path = "../turbomcp-dpop", optional = true }
 base64 = "0.22"
 sha2 = "0.10"
 urlencoding = "2.1"
@@ -95,22 +97,26 @@ full = [
     "websocket",
     "tcp",
     "unix",
+    "tls",
 ]
 schema-generation = ["schemars"]
 context-injection = []
 uri-templates = ["regex"]
 database = ["sqlx"]
+# Security enhancement features
+dpop = ["turbomcp-dpop"]
 # Transport features (progressive enhancement)
 stdio = ["turbomcp-transport/stdio", "turbomcp-server/stdio"]
 http = ["turbomcp-transport/http", "turbomcp-server/http"]
 websocket = ["turbomcp-transport/websocket", "turbomcp-server/websocket"]
 tcp = ["turbomcp-transport/tcp", "turbomcp-server/tcp"]
 unix = ["turbomcp-transport/unix", "turbomcp-server/unix"]
+tls = ["turbomcp-transport/tls"]
 # Convenience minimal features for specialized deployments
 minimal = ["internal-deps", "stdio"]  # Just STDIO - works everywhere
 network = ["internal-deps", "stdio", "tcp"]  # STDIO + TCP for network deployment  
 server-only = ["internal-deps", "tcp", "unix"]  # TCP + Unix for server deployment (no STDIO)
-all-transports = ["stdio", "http", "websocket", "tcp", "unix"]  # All transports without other features
+all-transports = ["stdio", "http", "websocket", "tcp", "unix", "tls"]  # All transports without other features
 internal-deps = ["turbomcp-core", "turbomcp-protocol", "turbomcp-transport", "turbomcp-server", "turbomcp-macros"]
 simd = ["turbomcp-core/simd", "simd-json", "sonic-rs"]
 

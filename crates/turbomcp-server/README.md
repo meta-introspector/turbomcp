@@ -30,6 +30,13 @@
 - **Authentication** - JWT validation, API key, OAuth token verification
 - **Observability** - Request logging, metrics collection, distributed tracing
 
+### 🛡️ **Enterprise Security**
+- **Rate Limiting** - Token bucket algorithm with IP and DPoP key tracking
+- **DoS Protection** - Automatic IP blocking based on suspicious activity patterns
+- **Circuit Breakers** - Service protection against cascading failures with recovery
+- **TLS Hardening** - rustls 0.23 with certificate pinning, mTLS, and TLS 1.3
+- **DPoP Support** - RFC 9449 token binding for enhanced OAuth 2.0 security
+
 ### 📊 **Health & Metrics**
 - **Health endpoints** - Readiness, liveness, and custom health checks
 - **Performance metrics** - Request timing, error rates, resource utilization

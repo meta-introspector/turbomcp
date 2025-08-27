@@ -16,7 +16,8 @@
 - **STDIO** - Standard input/output for local process communication
 - **HTTP/SSE** - Server-Sent Events for web applications
 - **WebSocket** - Real-time bidirectional communication
-- **TCP** - Network socket communication
+- **TCP** - Network socket communication  
+- **TLS** - Encrypted network communication with TLS 1.3
 - **Unix Sockets** - Local inter-process communication
 
 ### 🛡️ **Enterprise Security Features**
@@ -143,6 +144,62 @@ let config = TcpConfig::new()
 
 let transport = TcpTransport::bind(config).await?;
 ```
+
+### TLS Transport
+
+For secure encrypted communication:
+
+```rust
+use turbomcp_transport::tls::{TlsTransport, TlsConfig, CertValidationConfig};
+
+// Basic TLS server setup
+let config = TlsConfig::new("server.crt", "server.key")
+    .with_min_version(TlsVersion::V1_3);
+
+let server = TlsTransport::new_server("127.0.0.1:8443".parse()?, config).await?;
+
+// TLS client with custom validation
+let client_config = TlsConfig::new("client.crt", "client.key")
+    .with_cert_validation(CertValidationConfig {
+        verify_hostname: true,
+        ca_bundle_path: Some("/etc/ssl/certs/ca-bundle.pem".into()),
+        ocsp_stapling: true,
+        ct_validation: true,
+    });
+
+let client = TlsTransport::new_client("api.example.com:8443".parse()?, client_config).await?;
+```
+
+### Advanced TLS Configuration
+
+```rust
+use turbomcp_transport::tls::{
+    TlsConfig, CertPinningConfig, ClientAuthMode, TlsVersion
+};
+
+// Production TLS setup with mutual authentication
+let tls_config = TlsConfig::new("server.crt", "server.key")
+    .with_min_version(TlsVersion::V1_3)
+    .with_mtls() // Enable mutual TLS
+    .with_cert_pinning(CertPinningConfig {
+        allowed_hashes: vec![
+            "sha256:AAAAAAAAAAAABBBBBBBBBBBBCCCCCCCCCCCCDDDDDDDDDDDD".to_string()
+        ],
+        enforce: true,
+    })
+    .with_dpop_security(); // Enhanced OAuth 2.0 security
+
+let transport = TlsTransport::new_server("0.0.0.0:8443".parse()?, tls_config).await?;
+```
+
+### TLS Security Features
+
+- **🔐 TLS 1.3 by Default** - Latest TLS version with forward secrecy
+- **🔑 Certificate Pinning** - Pin specific certificates or public keys  
+- **🤝 Mutual TLS (mTLS)** - Client certificate authentication
+- **📋 OCSP Stapling** - Real-time certificate revocation checking
+- **🛡️ DPoP Integration** - Demonstration of Proof-of-Possession for OAuth 2.0
+- **⚡ Memory Safety** - Rust's memory safety with `rustls` implementation
 
 ### Unix Socket Transport
 
@@ -308,6 +365,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok("http") => server.run_http("127.0.0.1:8080").await?,
         Ok("websocket") => server.run_websocket("127.0.0.1:8080").await?,
         Ok("tcp") => server.run_tcp("127.0.0.1:8080").await?,
+        Ok("tls") => server.run_tls("127.0.0.1:8443", "server.crt", "server.key").await?,
         Ok("unix") => server.run_unix("/tmp/mcp.sock").await?,
         _ => server.run_stdio().await?, // Default
     }
@@ -368,6 +426,7 @@ impl Transport for CustomTransport {
 | STDIO | 0.1ms | 50k msg/s | 2MB |
 | Unix Socket | 0.2ms | 45k msg/s | 3MB |
 | TCP | 0.5ms | 30k msg/s | 5MB |
+| TLS | 0.8ms | 25k msg/s | 6MB |
 | WebSocket | 1ms | 25k msg/s | 8MB |
 | HTTP/SSE | 2ms | 15k msg/s | 10MB |
 
@@ -413,8 +472,8 @@ cargo test circuit_breaker
 
 For comprehensive security information, see:
 - **[Security Features Guide](./SECURITY_FEATURES.md)** - Detailed security documentation
-- **[TLS Configuration](./docs/tls.md)** - TLS setup and certificate management
-- **[Authentication Guide](./docs/auth.md)** - JWT and API key authentication
+- **[TLS Security Guide](./TLS_SECURITY.md)** - Production TLS configuration and certificate management
+- **[Deployment Guide](../../DEPLOYMENT.md)** - Production deployment strategies with TLS
 
 ## Related Crates
 

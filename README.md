@@ -12,9 +12,9 @@
 TurboMCP is a production-ready Rust implementation of the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) featuring:
 
 - **🚀 High Performance** - SIMD-accelerated JSON processing with `simd-json` and `sonic-rs`
-- **🛡️ Enterprise Security** - OAuth 2.0, CORS, rate limiting, security headers, TLS support
+- **🛡️ Enterprise Security** - OAuth 2.0, DPoP, TLS 1.3, CORS, DoS protection, circuit breakers
 - **⚡ Zero-Overhead Macros** - Ergonomic `#[server]`, `#[tool]`, `#[resource]` attributes  
-- **🔗 Multi-Transport** - STDIO, HTTP/SSE, WebSocket, TCP, Unix sockets
+- **🔗 Multi-Transport** - STDIO, HTTP/SSE, WebSocket, TCP, TLS, Unix sockets
 - **🎯 Type Safety** - Compile-time validation with automatic schema generation
 - **🔄 Production Ready** - Circuit breakers, graceful shutdown, session management
 
@@ -115,9 +115,11 @@ let app = Router::new()
 **Security Features:**
 - 🔒 **CORS Protection** - Environment-aware cross-origin policies
 - 📋 **Security Headers** - CSP, HSTS, X-Frame-Options, and more
-- ⚡ **Rate Limiting** - Token bucket algorithm with flexible strategies
-- 🔑 **Multi-Auth** - JWT validation and API key authentication
-- 🔐 **TLS Support** - Automatic certificate loading with TLS 1.3
+- ⚡ **Rate Limiting** - Token bucket algorithm with IP and DPoP key tracking
+- 🛡️ **DoS Protection** - Automatic IP blocking based on suspicious activity
+- 🔧 **Circuit Breakers** - Service protection against cascading failures  
+- 🔑 **Multi-Auth** - JWT validation, API key, and DPoP authentication
+- 🔐 **TLS Hardening** - rustls 0.23 with certificate pinning and mTLS
 
 ### OAuth 2.0 Authentication
 
@@ -159,6 +161,7 @@ impl AuthenticatedServer {
 **OAuth Features:**
 - 🔐 **Multiple Providers** - Google, GitHub, Microsoft, custom OAuth 2.0
 - 🛡️ **Always-On PKCE** - Security enabled by default
+- 🔒 **DPoP Support** - RFC 9449 token binding for enhanced security
 - 🔄 **All OAuth Flows** - Authorization Code, Client Credentials, Device Code
 - 👥 **Session Management** - User session tracking with cleanup
 
@@ -199,6 +202,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     match std::env::var("TRANSPORT").as_deref() {
         Ok("tcp") => server.run_tcp("127.0.0.1:8080").await?,
+        Ok("tls") => server.run_tls("127.0.0.1:8443", "./cert.pem", "./key.pem").await?,
         Ok("unix") => server.run_unix("/tmp/mcp.sock").await?,
         _ => server.run_stdio().await?, // Default
     }
@@ -241,7 +245,7 @@ TurboMCP is organized into focused crates:
 | [`turbomcp`](./crates/turbomcp/) | Main SDK | Procedural macros, prelude, integration |
 | [`turbomcp-core`](./crates/turbomcp-core/) | Core types | SIMD message handling, sessions, errors |
 | [`turbomcp-protocol`](./crates/turbomcp-protocol/) | MCP protocol | JSON-RPC, schema validation, versioning |
-| [`turbomcp-transport`](./crates/turbomcp-transport/) | Transport layer | HTTP, WebSocket, circuit breakers |
+| [`turbomcp-transport`](./crates/turbomcp-transport/) | Transport layer | HTTP, WebSocket, TLS, TCP, circuit breakers |
 | [`turbomcp-server`](./crates/turbomcp-server/) | Server framework | Routing, authentication, middleware |
 | [`turbomcp-client`](./crates/turbomcp-client/) | Client library | Connection management, error recovery |
 | [`turbomcp-macros`](./crates/turbomcp-macros/) | Proc macros | `#[server]`, `#[tool]`, `#[resource]` |
@@ -350,7 +354,9 @@ cargo bench --workspace                      # Run benchmarks
 ## Documentation
 
 - **[API Documentation](https://docs.rs/turbomcp)** - Complete API reference
-- **[Security Guide](./crates/turbomcp-transport/SECURITY_FEATURES.md)** - Comprehensive security documentation  
+- **[Security Guide](./crates/turbomcp-transport/SECURITY_FEATURES.md)** - Comprehensive security documentation
+- **[TLS Security Guide](./crates/turbomcp-transport/TLS_SECURITY.md)** - Production TLS configuration and best practices
+- **[Deployment Guide](./DEPLOYMENT.md)** - Production deployment strategies with TLS
 - **[Architecture Guide](./ARCHITECTURE.md)** - System design and components
 - **[MCP Specification](https://modelcontextprotocol.io)** - Official protocol docs
 

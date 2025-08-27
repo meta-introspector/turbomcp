@@ -1,0 +1,83 @@
+[package]
+name = "turbomcp-dpop"
+version = "1.0.0"
+edition = "2021"
+authors = ["Nicholas Paterno <nick@epistates.com>"]
+description = "RFC 9449 compliant Demonstration of Proof-of-Possession (DPoP) implementation for TurboMCP"
+license = "MIT"
+repository = "https://github.com/Epistates/turbomcp"
+keywords = ["mcp", "dpop", "oauth", "security", "proof-of-possession"]
+categories = ["cryptography", "authentication", "web-programming"]
+readme = "README.md"
+rust-version = "1.89.0"
+
+[dependencies]
+# Core TurboMCP dependencies
+turbomcp-core = { version = "1.0.1", path = "../turbomcp-core" }
+turbomcp-protocol = { version = "1.0.1", path = "../turbomcp-protocol" }
+
+# Async runtime
+tokio = { workspace = true, features = ["sync", "time", "rt"] }
+async-trait = { workspace = true }
+
+# Cryptographic foundations
+jsonwebtoken = { version = "9.3", optional = true }
+ring = "0.17"
+rsa = { version = "0.9", features = ["sha2"] }
+p256 = { version = "0.13", features = ["ecdsa"] }
+rand = "0.8"
+sha2 = "0.10"
+url = "2.4"
+signature = "2.2"
+
+# Serialization and time
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
+chrono = { workspace = true, features = ["serde"] }
+
+# Error handling
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# Utilities
+base64 = "0.22"
+hex = "0.4"
+zeroize = "1.7"
+
+# Logging
+tracing = { workspace = true }
+
+# Optional features
+redis = { version = "0.25", optional = true }
+aws-sdk-kms = { version = "1.0", optional = true }
+pkcs11 = { version = "0.5", optional = true }
+
+[dev-dependencies]
+tokio-test = { workspace = true }
+criterion = { workspace = true }
+pretty_assertions = { workspace = true }
+serial_test = "3.0"
+
+[features]
+default = ["jwt-validation"]
+
+# Core DPoP features
+jwt-validation = ["dep:jsonwebtoken"]
+key-rotation = []
+
+# Storage backends
+redis-storage = ["redis"]
+memory-storage = []
+
+# Enterprise features  
+hsm-support = ["pkcs11"]
+aws-kms = ["aws-sdk-kms"]
+
+# Development and testing
+test-utils = []
+
+# Benchmarks will be added later
+# [[bench]]
+# name = "dpop_benchmarks"
+# harness = false

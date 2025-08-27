@@ -76,6 +76,9 @@ pub mod tcp;
 #[cfg(feature = "unix")]
 pub mod unix;
 
+#[cfg(feature = "tls")]
+pub mod tls;
+
 pub mod child_process;
 
 #[cfg(feature = "compression")]
@@ -86,6 +89,11 @@ pub mod metrics;
 pub mod pool;
 pub mod robustness;
 
+// DPoP integration (optional feature)
+#[cfg(feature = "dpop")]
+#[cfg_attr(docsrs, doc(cfg(feature = "dpop")))]
+pub mod dpop;
+
 // Re-export core transport traits and types
 pub use core::{
     Transport, TransportCapabilities, TransportConfig, TransportError, TransportEvent,
@@ -95,6 +103,12 @@ pub use core::{
 // Re-export transport implementations
 #[cfg(feature = "stdio")]
 pub use stdio::StdioTransport;
+
+#[cfg(feature = "tls")]
+pub use tls::{
+    CertPinningConfig, CertValidationConfig, ClientAuthMode, TlsConfig, TlsError, TlsTransport,
+    TlsVersion,
+};
 
 // Re-export Tower integration
 pub use tower::{SessionInfo, SessionManager, TowerTransportAdapter};
@@ -122,6 +136,10 @@ pub use robustness::{
     CircuitBreakerConfig, CircuitBreakerStats, CircuitState, HealthCheckConfig, HealthInfo,
     HealthStatus, RetryConfig, RobustTransport,
 };
+
+// Re-export DPoP integration
+#[cfg(feature = "dpop")]
+pub use dpop::{DpopMessageBuilder, DpopMetadataExt, DpopTransportConfig, DpopTransportExt};
 
 /// Transport feature detection
 #[derive(Debug)]
