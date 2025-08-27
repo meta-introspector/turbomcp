@@ -48,5 +48,5 @@ async fn main() -> McpResult<()> {
 
     // Create and run the server
     let server = DemoServer::new();
-    Box::new(server).run_stdio().await
+    server.run_stdio().await
 }

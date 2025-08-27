@@ -26,6 +26,7 @@ Add TurboMCP to your `Cargo.toml`:
 [dependencies]
 turbomcp = "1.0"
 tokio = { version = "1.0", features = ["full"] }
+serde_json = "1.0"
 ```
 
 Create a simple calculator server:
@@ -138,7 +139,7 @@ impl AuthenticatedServer {
         if let Some(user_id) = ctx.user_id() {
             Ok(format!("Authenticated user: {}", user_id))
         } else {
-            Err(McpError::Unauthorized("Authentication required".to_string()))
+            Err(mcp_error!("Authentication required"))
         }
     }
 
@@ -149,7 +150,7 @@ impl AuthenticatedServer {
             let auth_result = oauth_provider.start_authorization().await?;
             Ok(format!("Visit: {}", auth_result.auth_url))
         } else {
-            Err(McpError::InvalidInput(format!("Unknown provider: {}", provider)))
+            Err(mcp_error!("Unknown provider: {}", provider))
         }
     }
 }
@@ -274,7 +275,7 @@ URI template-based resource handling:
 #[resource("file://{path}")]
 async fn read_file(&self, path: String) -> McpResult<String> {
     tokio::fs::read_to_string(&path).await
-        .map_err(|e| McpError::Resource(e.to_string()))
+        .map_err(|e| mcp_error!("Resource error: {}", e))
 }
 ```
 
