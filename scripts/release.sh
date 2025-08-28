@@ -302,12 +302,54 @@ print_info "Scanning for problematic code patterns..."
 search_tool=$(detect_search_tool)
 print_info "Using search tool: $search_tool"
 
-todo_count=$(search_pattern "TODO.*implement|TODO.*stub|not_implemented|unimplemented!\(\)" "crates/")
+# CRITICAL: Placeholder detection patterns - ZERO TOLERANCE
+print_info "Running zero-tolerance placeholder detection..."
+
+# Critical placeholder patterns that indicate incomplete implementations
+critical_patterns=(
+    "This is a placeholder"
+    "For now, return.*placeholder"
+    "placeholder that can be expanded"
+    "In production, we'd use"
+    "would parse the actual"
+    "not yet fully implemented"
+    "This would be"
+    "TODO.*implement"
+    "TODO.*stub"
+    "unimplemented!\(\)"
+    "todo!\(\)"
+)
+
+placeholder_violations=0
+for pattern in "${critical_patterns[@]}"; do
+    # Search but exclude the enforcement test file itself
+    if command -v rg >/dev/null 2>&1; then
+        count=$(rg "$pattern" --type rust crates/ --count-matches 2>/dev/null | grep -v "zero_tolerance_enforcement.rs" | awk -F: '{sum+=$2} END {print (sum ? sum : 0)}')
+    else
+        count=$(find crates/ -name "*.rs" ! -name "zero_tolerance_enforcement.rs" -exec grep -l "$pattern" {} \; 2>/dev/null | wc -l | tr -d ' ')
+    fi
+    
+    if [ "$count" -gt 0 ]; then
+        print_error "CRITICAL: Found $count instances of placeholder pattern: '$pattern'"
+        print_info "Use this to inspect: find crates/ -name '*.rs' ! -name 'zero_tolerance_enforcement.rs' -exec grep -n '$pattern' {} +"
+        placeholder_violations=$((placeholder_violations + count))
+    fi
+done
+
+if [ "$placeholder_violations" -gt 0 ]; then
+    print_error "RELEASE BLOCKED: $placeholder_violations placeholder implementations found"
+    print_error "TurboMCP follows zero-tolerance policy: NO placeholders in releases"
+    exit 1
+fi
+
+print_status "Zero-tolerance placeholder check passed"
+
+# Additional TODOs check for non-critical items
+todo_count=$(search_pattern "TODO(?!(.*implement|.*stub))" "crates/")
 if [ "$todo_count" -gt 10 ]; then
-    print_warning "Found $todo_count critical TODOs/stubs (acceptable for experimental release)"
-    print_info "To inspect: find crates/ -name '*.rs' -exec grep -n 'TODO.*implement\\|TODO.*stub\\|not_implemented\\|unimplemented!' {} +"
+    print_warning "Found $todo_count general TODOs (acceptable for experimental release)"
 else
-    print_status "Code quality check passed ($todo_count TODOs found)"
+    print_status "General code quality check passed ($todo_count TODOs found)"
 fi
 
 # ============================================================================

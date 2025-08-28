@@ -1786,7 +1786,7 @@ impl AuthManager {
         if let Some(provider) = providers.get(&context.provider)
             && let Some(token) = &context.token
         {
-            let _ = provider.revoke_token(&token.access_token).await;
+            let _ = provider.revoke_token(&token.access_token).await; // OK: Revocation failure during cleanup is acceptable
         }
 
         Ok(())

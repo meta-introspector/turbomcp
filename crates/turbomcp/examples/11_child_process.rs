@@ -226,7 +226,7 @@ impl ChildProcessManager {
             }
             Err(_) => {
                 warn!("Child process did not complete within timeout");
-                let _ = child.kill().await;
+                let _ = child.kill().await; // OK: Error during cleanup is acceptable
             }
         }
 
@@ -435,7 +435,7 @@ impl RobustChildProcess {
             info!("Shutting down child process gracefully");
 
             // Try graceful shutdown first
-            let _ = child.kill().await;
+            let _ = child.kill().await; // OK: Error during shutdown cleanup is acceptable
 
             // Wait for process to exit
             match timeout(Duration::from_secs(5), child.wait()).await {

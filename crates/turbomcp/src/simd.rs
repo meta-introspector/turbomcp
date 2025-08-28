@@ -628,7 +628,7 @@ mod tests {
 
         // Perform operations
         let _: serde_json::Value = processor.parse(&json_bytes).await.unwrap();
-        let _ = processor.serialize(&json_data).await.unwrap();
+        let _ = processor.serialize(&json_data).await.unwrap(); // OK: Benchmark test discards result
 
         let metrics = processor.metrics().await;
         assert_eq!(metrics.parse_operations, 1);

@@ -44,16 +44,42 @@ const FORBIDDEN_PATTERNS: &[(&str, &str)] = &[
         "generate_schema::<",
         "Using schemars instead of actual macro-generated schemas",
     ),
-    // Placeholder/mock patterns (with exceptions for legitimate test doubles)
+    // Placeholder/mock patterns (CRITICAL - applies to all code)
     (
         "// TODO: implement",
-        "Incomplete test - no TODOs allowed in tests",
+        "Incomplete implementation - no TODOs allowed",
     ),
-    ("todo!()", "Incomplete implementation - no todo!() in tests"),
+    ("todo!()", "Incomplete implementation - no todo!() allowed"),
     (
         "unimplemented!()",
-        "Incomplete implementation - no unimplemented!() in tests",
+        "Incomplete implementation - no unimplemented!() allowed",
     ),
+    // CRITICAL: Placeholder patterns that were missed
+    (
+        "This is a placeholder",
+        "CRITICAL: Placeholder implementation found",
+    ),
+    (
+        "For now, return",
+        "CRITICAL: Temporary placeholder implementation",
+    ),
+    (
+        "placeholder that can be expanded",
+        "CRITICAL: Placeholder comment indicating incomplete code",
+    ),
+    (
+        "In production, we'd use",
+        "CRITICAL: Non-production placeholder implementation",
+    ),
+    (
+        "would parse the actual",
+        "CRITICAL: Placeholder indicating missing functionality",
+    ),
+    (
+        "not yet fully implemented",
+        "CRITICAL: Incomplete implementation",
+    ),
+    ("This would be", "CRITICAL: Hypothetical/placeholder code"),
     // Empty test patterns
     ("fn test_", "Check for empty test functions"),
 ];
@@ -66,6 +92,9 @@ const ALLOWED_EXCEPTIONS: &[&str] = &[
     "TEST_AUDIT_REPORT.md",
     // Documentation files
     "ARCHITECTURAL_GAP_ANALYSIS.md",
+    // Schema module legitimately uses generate_schema
+    "src/schema.rs",
+    "src/structured.rs",
 ];
 
 /// Check if a file path should be excluded from enforcement
@@ -79,17 +108,28 @@ fn is_excluded(path: &Path) -> bool {
         }
     }
 
-    // Exclude non-test files (unless they're in test directories)
-    if !path_str.contains("/tests/") && !path_str.contains("_test") {
-        return true;
-    }
-
     // Exclude non-Rust files
     if !path_str.ends_with(".rs") {
         return true;
     }
 
+    // Exclude target directory
+    if path_str.contains("/target/") {
+        return true;
+    }
+
+    // Exclude this enforcement test file specifically
+    if path_str.contains("zero_tolerance_enforcement.rs") {
+        return true;
+    }
+
     false
+}
+
+/// Check if a path is a test file
+fn is_test_file(path: &Path) -> bool {
+    let path_str = path.to_string_lossy();
+    path_str.contains("/tests/") || path_str.contains("_test") || path_str.ends_with("_tests.rs")
 }
 
 /// Scan a file for forbidden patterns
@@ -105,9 +145,27 @@ fn scan_file(path: &Path) -> FileViolations {
         Err(_) => return violations,
     };
 
+    let is_test = is_test_file(path);
+
     for (line_num, line) in content.lines().enumerate() {
         for &(pattern, reason) in FORBIDDEN_PATTERNS {
             if line.contains(pattern) {
+                // Test-only patterns
+                if matches!(
+                    pattern,
+                    "assert_eq!(2 + 2, 4)"
+                        | "assert_eq!(1 + 1, 2)"
+                        | "assert!(true)"
+                        | "assert!(false == false)"
+                        | "schemars::schema_for!"
+                        | "generate_schema:<"
+                        | "fn test_"
+                ) {
+                    if !is_test {
+                        continue; // Skip test-only patterns for non-test files
+                    }
+                }
+
                 // Special handling for legitimate patterns
                 if pattern == "fn test_" {
                     // Check if it's an empty test function
@@ -141,6 +199,16 @@ fn scan_file(path: &Path) -> FileViolations {
                     continue;
                 }
 
+                if pattern == "generate_schema:<" {
+                    // Allow legitimate schemars usage in schema module
+                    if path.to_string_lossy().contains("schema.rs")
+                        || path.to_string_lossy().contains("structured.rs")
+                        || line.contains("crate::schema::generate_schema")
+                    {
+                        continue; // Skip legitimate schema generation usage
+                    }
+                }
+
                 // For other patterns, direct violation
                 violations.push((line_num + 1, line.trim().to_string(), reason.to_string()));
             }
@@ -154,8 +222,8 @@ fn scan_file(path: &Path) -> FileViolations {
 type FileViolations = Vec<(usize, String, String)>;
 type AllViolations = Vec<(PathBuf, FileViolations)>;
 
-/// Scan all test files in the project
-fn scan_all_test_files() -> AllViolations {
+/// Scan all source files in the project for violations
+fn scan_all_source_files() -> AllViolations {
     let mut all_violations = Vec::new();
 
     // Walk through the entire project
@@ -171,8 +239,9 @@ fn scan_all_test_files() -> AllViolations {
             continue;
         }
 
-        // Skip target directory
-        if path.to_string_lossy().contains("/target/") {
+        // Skip target directory and other generated directories
+        let path_str = path.to_string_lossy();
+        if path_str.contains("/target/") || path_str.contains("/.git/") {
             continue;
         }
 
@@ -190,12 +259,13 @@ fn scan_all_test_files() -> AllViolations {
 fn test_zero_tolerance_enforcement() {
     println!("🔍 Running Zero-Tolerance Test Quality Enforcement...\n");
 
-    let violations = scan_all_test_files();
+    let violations = scan_all_source_files();
 
     if violations.is_empty() {
-        println!("✅ All test files pass zero-tolerance quality standards!");
+        println!("✅ All source files pass zero-tolerance quality standards!");
+        println!("✅ No placeholder implementations detected!");
         println!("✅ No fraudulent test patterns detected!");
-        println!("✅ High-quality test suite maintained!");
+        println!("✅ Production-grade codebase maintained!");
         return;
     }
 
